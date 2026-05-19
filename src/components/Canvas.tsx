@@ -1,43 +1,20 @@
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   clampZoom,
+  makeRectFromPoints,
+  rectsIntersect,
   screenToCanvas,
   translatePoint,
   type Point,
+  type Rect,
 } from "../lib/geometry";
-import type { CanvasDocument } from "../types/Document";
+import { resolveMoveSnapping, type Guide } from "../lib/snapping";
 import type { Shape } from "./../types/Shape";
+import {
+  createInitialHistoryState,
+  historyReducer,
+} from "../types/Document";
 import type { Viewport } from "../types/Viewport";
-
-const INITIAL_SHAPES: Shape[] = [
-  {
-    id: "1",
-    type: "rectangle",
-    x: 150,
-    y: 150,
-    width: 200,
-    height: 100,
-    color: "red",
-  },
-  {
-    id: "2",
-    type: "rectangle",
-    x: 1600,
-    y: 900,
-    width: 100,
-    height: 100,
-    color: "blue",
-  },
-  {
-    id: "3",
-    type: "rectangle",
-    x: 900,
-    y: 500,
-    width: 100,
-    height: 200,
-    color: "green",
-  },
-];
 
 type InteractionState =
   | { mode: "idle" }
@@ -48,35 +25,76 @@ type InteractionState =
       startViewport: Viewport;
     }
   | {
-      mode: "dragging-shape";
+      mode: "dragging-shapes";
       pointerId: number;
-      shapeId: string;
+      leadShapeId: string;
+      shapeIds: string[];
       startCanvasPoint: Point;
-      startShapePosition: Point;
-      previewPosition: Point;
+      startShapePositions: Record<string, Point>;
+      previewPositions: Record<string, Point>;
+      guides: Guide[];
+    }
+  | {
+      mode: "marquee";
+      pointerId: number;
+      startCanvasPoint: Point;
+      currentCanvasPoint: Point;
     };
-
-function createInitialDocument(): CanvasDocument {
-  return {
-    shapes: INITIAL_SHAPES,
-  };
-}
 
 export default function Canvas() {
   const worldRef = useRef<HTMLDivElement | null>(null);
-  const [document, setDocument] = useState<CanvasDocument>(createInitialDocument);
+  const [history, dispatchHistory] = useReducer(
+    historyReducer,
+    undefined,
+    createInitialHistoryState,
+  );
   const [viewport, setViewport] = useState<Viewport>({
     panX: 0,
     panY: 0,
     zoom: 1,
   });
-  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
+  const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [interaction, setInteraction] = useState<InteractionState>({
     mode: "idle",
   });
 
   const isPanning = interaction.mode === "panning";
-  const isDraggingShape = interaction.mode === "dragging-shape";
+  const isDraggingShape = interaction.mode === "dragging-shapes";
+  const document = history.present;
+
+  const shapeMap = useMemo(() => {
+    return new Map(document.shapes.map((shape) => [shape.id, shape]));
+  }, [document.shapes]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (interaction.mode !== "idle") {
+        return;
+      }
+
+      const hasUndoModifier = event.metaKey || event.ctrlKey;
+
+      if (!hasUndoModifier || event.key.toLowerCase() !== "z") {
+        if (hasUndoModifier && event.key.toLowerCase() === "y") {
+          event.preventDefault();
+          setInteraction({ mode: "idle" });
+          dispatchHistory({ type: "redo" });
+        }
+
+        return;
+      }
+
+      event.preventDefault();
+      setInteraction({ mode: "idle" });
+      dispatchHistory({ type: event.shiftKey ? "redo" : "undo" });
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [interaction.mode]);
 
   const getLocalPoint = (clientX: number, clientY: number): Point => {
     const rect = worldRef.current?.getBoundingClientRect();
@@ -123,7 +141,24 @@ export default function Canvas() {
     }
 
     capturePointer(e.pointerId);
-    setSelectedShapeId(null);
+
+    if (e.shiftKey) {
+      const startCanvasPoint = screenToCanvas(
+        getLocalPoint(e.clientX, e.clientY),
+        viewport,
+      );
+
+      setInteraction({
+        mode: "marquee",
+        pointerId: e.pointerId,
+        startCanvasPoint,
+        currentCanvasPoint: startCanvasPoint,
+      });
+
+      return;
+    }
+
+    setSelectedShapeIds([]);
     setInteraction({
       mode: "panning",
       pointerId: e.pointerId,
@@ -133,6 +168,10 @@ export default function Canvas() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (interaction.mode === "idle") {
+      return;
+    }
+
     if (interaction.pointerId !== e.pointerId) {
       return;
     }
@@ -150,19 +189,90 @@ export default function Canvas() {
       return;
     }
 
-    if (interaction.mode === "dragging-shape") {
+    if (interaction.mode === "dragging-shapes") {
       const currentCanvasPoint = screenToCanvas(
         getLocalPoint(e.clientX, e.clientY),
         viewport,
       );
       const dx = currentCanvasPoint.x - interaction.startCanvasPoint.x;
       const dy = currentCanvasPoint.y - interaction.startCanvasPoint.y;
+      const leadShape = shapeMap.get(interaction.leadShapeId);
+
+      if (!leadShape) {
+        return;
+      }
+
+      const leadStartPosition =
+        interaction.startShapePositions[interaction.leadShapeId];
+
+      if (!leadStartPosition) {
+        return;
+      }
+
+      const snappedLeadResult = resolveMoveSnapping({
+        movingRect: {
+          x: leadStartPosition.x + dx,
+          y: leadStartPosition.y + dy,
+          width: leadShape.width,
+          height: leadShape.height,
+        },
+        stationaryRects: document.shapes
+          .filter((shape) => !interaction.shapeIds.includes(shape.id))
+          .map((shape) => ({
+            x: shape.x,
+            y: shape.y,
+            width: shape.width,
+            height: shape.height,
+          })),
+        threshold: 8 / viewport.zoom,
+      });
+      const snappedDx = snappedLeadResult.position.x - leadStartPosition.x;
+      const snappedDy = snappedLeadResult.position.y - leadStartPosition.y;
+
+      const previewPositions = Object.fromEntries(
+        interaction.shapeIds.flatMap((shapeId) => {
+          const startPosition = interaction.startShapePositions[shapeId];
+
+          if (!startPosition) {
+            return [];
+          }
+
+          return [
+            [
+              shapeId,
+              translatePoint(startPosition, snappedDx, snappedDy),
+            ] as const,
+          ];
+        }),
+      );
 
       setInteraction({
         ...interaction,
-        previewPosition: translatePoint(interaction.startShapePosition, dx, dy),
+        previewPositions,
+        guides: snappedLeadResult.guides,
       });
+
+      return;
     }
+
+    const currentCanvasPoint = screenToCanvas(
+      getLocalPoint(e.clientX, e.clientY),
+      viewport,
+    );
+    const marqueeRect = makeRectFromPoints(
+      interaction.startCanvasPoint,
+      currentCanvasPoint,
+    );
+
+    setSelectedShapeIds(
+      document.shapes
+        .filter((shape) => rectsIntersect(marqueeRect, shapeToRect(shape)))
+        .map((shape) => shape.id),
+    );
+    setInteraction({
+      ...interaction,
+      currentCanvasPoint,
+    });
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -170,19 +280,14 @@ export default function Canvas() {
       return;
     }
 
-    if (interaction.mode === "dragging-shape") {
-      setDocument((current) => ({
-        ...current,
-        shapes: current.shapes.map((shape) =>
-          shape.id === interaction.shapeId
-            ? {
-                ...shape,
-                x: interaction.previewPosition.x,
-                y: interaction.previewPosition.y,
-              }
-            : shape,
-        ),
-      }));
+    if (interaction.mode === "dragging-shapes") {
+      dispatchHistory({
+        type: "document",
+        action: {
+          type: "moveShapes",
+          positions: interaction.previewPositions,
+        },
+      });
     }
 
     releasePointer(e.pointerId);
@@ -207,35 +312,81 @@ export default function Canvas() {
     }
 
     e.stopPropagation();
-    const shape = document.shapes.find((currentShape) => currentShape.id === shapeId);
+
+    if (e.shiftKey) {
+      setSelectedShapeIds((current) =>
+        current.includes(shapeId)
+          ? current.filter((id) => id !== shapeId)
+          : [...current, shapeId],
+      );
+
+      return;
+    }
+
+    const shape = shapeMap.get(shapeId);
 
     if (!shape) {
       return;
     }
 
+    const nextSelectedIds = selectedShapeIds.includes(shapeId)
+      ? selectedShapeIds
+      : [shapeId];
+    const startShapePositions = Object.fromEntries(
+      nextSelectedIds.flatMap((selectedId) => {
+        const selectedShape = shapeMap.get(selectedId);
+
+        if (!selectedShape) {
+          return [];
+        }
+
+        return [
+          [selectedId, { x: selectedShape.x, y: selectedShape.y }] as const,
+        ];
+      }),
+    );
+
     capturePointer(e.pointerId);
-    setSelectedShapeId(shapeId);
+    setSelectedShapeIds(nextSelectedIds);
     setInteraction({
-      mode: "dragging-shape",
+      mode: "dragging-shapes",
       pointerId: e.pointerId,
-      shapeId,
-      startCanvasPoint: screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport),
-      startShapePosition: { x: shape.x, y: shape.y },
-      previewPosition: { x: shape.x, y: shape.y },
+      leadShapeId: shapeId,
+      shapeIds: nextSelectedIds,
+      startCanvasPoint: screenToCanvas(
+        getLocalPoint(e.clientX, e.clientY),
+        viewport,
+      ),
+      startShapePositions,
+      previewPositions: startShapePositions,
+      guides: [],
     });
   };
 
   const renderedShapes = document.shapes.map((shape) => {
-    if (interaction.mode === "dragging-shape" && interaction.shapeId === shape.id) {
-      return {
-        ...shape,
-        x: interaction.previewPosition.x,
-        y: interaction.previewPosition.y,
-      };
+    if (interaction.mode === "dragging-shapes") {
+      const previewPosition = interaction.previewPositions[shape.id];
+
+      if (previewPosition) {
+        return {
+          ...shape,
+          x: previewPosition.x,
+          y: previewPosition.y,
+        };
+      }
     }
 
     return shape;
   });
+  const activeGuides =
+    interaction.mode === "dragging-shapes" ? interaction.guides : [];
+  const marqueeRect =
+    interaction.mode === "marquee"
+      ? makeRectFromPoints(
+          interaction.startCanvasPoint,
+          interaction.currentCanvasPoint,
+        )
+      : null;
 
   return (
     <div
@@ -261,8 +412,9 @@ export default function Canvas() {
         {renderedShapes.map((shape: Shape) => (
           <div
             key={"shape" + shape.id}
-            className={`shape${selectedShapeId === shape.id ? " is-selected" : ""}${
-              interaction.mode === "dragging-shape" && interaction.shapeId === shape.id
+            className={`shape${selectedShapeIds.includes(shape.id) ? " is-selected" : ""}${
+              interaction.mode === "dragging-shapes" &&
+              interaction.shapeIds.includes(shape.id)
                 ? " is-dragging"
                 : ""
             }`}
@@ -278,11 +430,70 @@ export default function Canvas() {
         ))}
       </div>
 
+      <svg className="overlay" aria-hidden="true">
+        <g
+          transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}
+        >
+          {activeGuides.map((guide, index) => {
+            if (guide.orientation === "vertical") {
+              return (
+                <line
+                  key={`guide-${index}`}
+                  className="snap-guide"
+                  x1={guide.x}
+                  x2={guide.x}
+                  y1={guide.y1}
+                  y2={guide.y2}
+                />
+              );
+            }
+
+            return (
+              <line
+                key={`guide-${index}`}
+                className="snap-guide"
+                x1={guide.x1}
+                x2={guide.x2}
+                y1={guide.y}
+                y2={guide.y}
+              />
+            );
+          })}
+
+          {marqueeRect ? (
+            <rect
+              className="marquee"
+              x={marqueeRect.x}
+              y={marqueeRect.y}
+              width={marqueeRect.width}
+              height={marqueeRect.height}
+            />
+          ) : null}
+        </g>
+      </svg>
+
       <div className="hud">
         <span>zoom {viewport.zoom.toFixed(2)}x</span>
-        <span>selected {selectedShapeId ?? "none"}</span>
+        <span>
+          selected{" "}
+          {selectedShapeIds.length > 0 ? selectedShapeIds.join(",") : "none"}
+        </span>
         <span>mode {interaction.mode}</span>
+        <span>
+          history {history.past.length}/{history.future.length}
+        </span>
+        <span>shift+drag marquee</span>
+        <span>cmd/ctrl+z undo</span>
       </div>
     </div>
   );
+}
+
+function shapeToRect(shape: Shape): Rect {
+  return {
+    x: shape.x,
+    y: shape.y,
+    width: shape.width,
+    height: shape.height,
+  };
 }

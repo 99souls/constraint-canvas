@@ -1,5 +1,5 @@
 export type Viewport = {
-  cameraX: number;
-  cameraY: number;
+  panX: number;
+  panY: number;
   zoom: number;
 };

@@ -22,3 +22,10 @@ export function canvasToScreen(point: Point, viewport: Viewport): Point {
     y: point.y * viewport.zoom + viewport.panY,
   };
 }
+
+export function translatePoint(point: Point, dx: number, dy: number): Point {
+  return {
+    x: point.x + dx,
+    y: point.y + dy,
+  };
+}

@@ -1,5 +1,10 @@
 import { useRef, useState } from "react";
-import { clampZoom, screenToCanvas, type Point } from "../lib/geometry";
+import {
+  clampZoom,
+  screenToCanvas,
+  translatePoint,
+  type Point,
+} from "../lib/geometry";
 import type { CanvasDocument } from "../types/Document";
 import type { Shape } from "./../types/Shape";
 import type { Viewport } from "../types/Viewport";
@@ -41,6 +46,14 @@ type InteractionState =
       pointerId: number;
       startClientPoint: Point;
       startViewport: Viewport;
+    }
+  | {
+      mode: "dragging-shape";
+      pointerId: number;
+      shapeId: string;
+      startCanvasPoint: Point;
+      startShapePosition: Point;
+      previewPosition: Point;
     };
 
 function createInitialDocument(): CanvasDocument {
@@ -51,7 +64,7 @@ function createInitialDocument(): CanvasDocument {
 
 export default function Canvas() {
   const worldRef = useRef<HTMLDivElement | null>(null);
-  const [document] = useState<CanvasDocument>(createInitialDocument);
+  const [document, setDocument] = useState<CanvasDocument>(createInitialDocument);
   const [viewport, setViewport] = useState<Viewport>({
     panX: 0,
     panY: 0,
@@ -63,6 +76,7 @@ export default function Canvas() {
   });
 
   const isPanning = interaction.mode === "panning";
+  const isDraggingShape = interaction.mode === "dragging-shape";
 
   const getLocalPoint = (clientX: number, clientY: number): Point => {
     const rect = worldRef.current?.getBoundingClientRect();
@@ -119,29 +133,56 @@ export default function Canvas() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (
-      interaction.mode !== "panning" ||
-      interaction.pointerId !== e.pointerId
-    ) {
+    if (interaction.pointerId !== e.pointerId) {
       return;
     }
 
-    const dx = e.clientX - interaction.startClientPoint.x;
-    const dy = e.clientY - interaction.startClientPoint.y;
+    if (interaction.mode === "panning") {
+      const dx = e.clientX - interaction.startClientPoint.x;
+      const dy = e.clientY - interaction.startClientPoint.y;
 
-    setViewport({
-      ...interaction.startViewport,
-      panX: interaction.startViewport.panX + dx,
-      panY: interaction.startViewport.panY + dy,
-    });
+      setViewport({
+        ...interaction.startViewport,
+        panX: interaction.startViewport.panX + dx,
+        panY: interaction.startViewport.panY + dy,
+      });
+
+      return;
+    }
+
+    if (interaction.mode === "dragging-shape") {
+      const currentCanvasPoint = screenToCanvas(
+        getLocalPoint(e.clientX, e.clientY),
+        viewport,
+      );
+      const dx = currentCanvasPoint.x - interaction.startCanvasPoint.x;
+      const dy = currentCanvasPoint.y - interaction.startCanvasPoint.y;
+
+      setInteraction({
+        ...interaction,
+        previewPosition: translatePoint(interaction.startShapePosition, dx, dy),
+      });
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (
-      interaction.mode !== "panning" ||
-      interaction.pointerId !== e.pointerId
-    ) {
+    if (interaction.mode === "idle" || interaction.pointerId !== e.pointerId) {
       return;
+    }
+
+    if (interaction.mode === "dragging-shape") {
+      setDocument((current) => ({
+        ...current,
+        shapes: current.shapes.map((shape) =>
+          shape.id === interaction.shapeId
+            ? {
+                ...shape,
+                x: interaction.previewPosition.x,
+                y: interaction.previewPosition.y,
+              }
+            : shape,
+        ),
+      }));
     }
 
     releasePointer(e.pointerId);
@@ -149,10 +190,7 @@ export default function Canvas() {
   };
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (
-      interaction.mode !== "panning" ||
-      interaction.pointerId !== e.pointerId
-    ) {
+    if (interaction.mode === "idle" || interaction.pointerId !== e.pointerId) {
       return;
     }
 
@@ -164,9 +202,40 @@ export default function Canvas() {
     e: React.PointerEvent<HTMLDivElement>,
     shapeId: string,
   ) => {
+    if (e.button !== 0) {
+      return;
+    }
+
     e.stopPropagation();
+    const shape = document.shapes.find((currentShape) => currentShape.id === shapeId);
+
+    if (!shape) {
+      return;
+    }
+
+    capturePointer(e.pointerId);
     setSelectedShapeId(shapeId);
+    setInteraction({
+      mode: "dragging-shape",
+      pointerId: e.pointerId,
+      shapeId,
+      startCanvasPoint: screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport),
+      startShapePosition: { x: shape.x, y: shape.y },
+      previewPosition: { x: shape.x, y: shape.y },
+    });
   };
+
+  const renderedShapes = document.shapes.map((shape) => {
+    if (interaction.mode === "dragging-shape" && interaction.shapeId === shape.id) {
+      return {
+        ...shape,
+        x: interaction.previewPosition.x,
+        y: interaction.previewPosition.y,
+      };
+    }
+
+    return shape;
+  });
 
   return (
     <div
@@ -175,7 +244,7 @@ export default function Canvas() {
       style={{
         backgroundPosition: `${viewport.panX}px ${viewport.panY}px`,
         backgroundSize: `${40 * viewport.zoom}px ${40 * viewport.zoom}px`,
-        cursor: isPanning ? "grabbing" : "grab",
+        cursor: isPanning || isDraggingShape ? "grabbing" : "grab",
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -189,10 +258,14 @@ export default function Canvas() {
           transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
         }}
       >
-        {document.shapes.map((shape: Shape) => (
+        {renderedShapes.map((shape: Shape) => (
           <div
             key={"shape" + shape.id}
-            className={`shape${selectedShapeId === shape.id ? " is-selected" : ""}`}
+            className={`shape${selectedShapeId === shape.id ? " is-selected" : ""}${
+              interaction.mode === "dragging-shape" && interaction.shapeId === shape.id
+                ? " is-dragging"
+                : ""
+            }`}
             style={{
               left: shape.x + "px",
               top: shape.y + "px",
@@ -208,6 +281,7 @@ export default function Canvas() {
       <div className="hud">
         <span>zoom {viewport.zoom.toFixed(2)}x</span>
         <span>selected {selectedShapeId ?? "none"}</span>
+        <span>mode {interaction.mode}</span>
       </div>
     </div>
   );

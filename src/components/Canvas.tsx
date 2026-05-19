@@ -34,6 +34,7 @@ const shapes: Shape[] = [
 
 export default function Canvas() {
   const [camera, setCamera] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     setCamera((prev) => ({
@@ -42,10 +43,36 @@ export default function Canvas() {
     }));
   };
 
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button === 0) {
+      setIsPanning(true);
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isPanning) return;
+
+    setCamera((prev) => ({
+      x: prev.x + e.movementX,
+      y: prev.y + e.movementY,
+    }));
+  };
+
+  const handlePointerUp = () => {
+    setIsPanning(false);
+  };
+
   return (
     <div
       className="world"
-      style={{ backgroundPosition: `${camera.x}px ${camera.y}px` }}
+      style={{
+        backgroundPosition: `${camera.x}px ${camera.y}px`,
+        cursor: isPanning ? "grabbing" : "grab",
+      }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
     >
       <div
         className="screen"

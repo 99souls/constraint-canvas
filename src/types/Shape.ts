@@ -6,4 +6,5 @@ export type Shape = {
   width: number;
   height: number;
   color: string;
+  groupId?: string;
 };

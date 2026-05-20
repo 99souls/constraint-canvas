@@ -43,6 +43,61 @@ describe("documentReducer", () => {
       height: 120,
     });
   });
+
+  it("adds and deletes shapes", () => {
+    const document = createInitialDocument();
+
+    const addedDocument = documentReducer(document, {
+      type: "addShapes",
+      shapes: [
+        {
+          id: "new-shape",
+          type: "rectangle",
+          x: 10,
+          y: 20,
+          width: 30,
+          height: 40,
+          color: "purple",
+        },
+      ],
+    });
+
+    expect(addedDocument.shapes.some((shape) => shape.id === "new-shape")).toBe(true);
+
+    const deletedDocument = documentReducer(addedDocument, {
+      type: "deleteShapes",
+      shapeIds: ["new-shape"],
+    });
+
+    expect(deletedDocument.shapes.some((shape) => shape.id === "new-shape")).toBe(false);
+  });
+
+  it("sets and clears shape group ids", () => {
+    const document = createInitialDocument();
+
+    const groupedDocument = documentReducer(document, {
+      type: "setShapeGroups",
+      groupIdsByShapeId: {
+        "1": "group-alpha",
+        "2": "group-alpha",
+      },
+    });
+
+    expect(groupedDocument.shapes.find((shape) => shape.id === "1")).toMatchObject({
+      groupId: "group-alpha",
+    });
+
+    const ungroupedDocument = documentReducer(groupedDocument, {
+      type: "setShapeGroups",
+      groupIdsByShapeId: {
+        "1": undefined,
+      },
+    });
+
+    expect(ungroupedDocument.shapes.find((shape) => shape.id === "1")).not.toHaveProperty(
+      "groupId",
+    );
+  });
 });
 
 describe("historyReducer", () => {

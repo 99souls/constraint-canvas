@@ -9,13 +9,39 @@ export type MoveShapesAction = {
   positions: Record<string, { x: number; y: number }>;
 };
 
+export type AddShapesAction = {
+  type: "addShapes";
+  shapes: Shape[];
+};
+
+export type DeleteShapesAction = {
+  type: "deleteShapes";
+  shapeIds: string[];
+};
+
 export type ResizeShapeAction = {
   type: "resizeShape";
   shapeId: string;
   rect: { x: number; y: number; width: number; height: number };
 };
 
-export type DocumentAction = MoveShapesAction | ResizeShapeAction;
+export type SetShapeGroupsAction = {
+  type: "setShapeGroups";
+  groupIdsByShapeId: Record<string, string | undefined>;
+};
+
+export type LoadDocumentAction = {
+  type: "loadDocument";
+  document: CanvasDocument;
+};
+
+export type DocumentAction =
+  | MoveShapesAction
+  | AddShapesAction
+  | DeleteShapesAction
+  | ResizeShapeAction
+  | SetShapeGroupsAction
+  | LoadDocumentAction;
 
 export type DocumentHistory = {
   past: CanvasDocument[];
@@ -66,21 +92,52 @@ const INITIAL_SHAPES: Shape[] = [
 ];
 
 export function createInitialDocument(): CanvasDocument {
-  return {
+  return cloneDocument({
     shapes: INITIAL_SHAPES,
-  };
+  });
 }
 
-export function createInitialHistoryState(): DocumentHistory {
+export function createHistoryState(
+  document: CanvasDocument = createInitialDocument(),
+): DocumentHistory {
   return {
     past: [],
-    present: createInitialDocument(),
+    present: cloneDocument(document),
     future: [],
   };
 }
 
+export function createInitialHistoryState(): DocumentHistory {
+  return createHistoryState();
+}
+
 export function documentReducer(document: CanvasDocument, action: DocumentAction): CanvasDocument {
   switch (action.type) {
+    case "loadDocument": {
+      return cloneDocument(action.document);
+    }
+    case "addShapes": {
+      if (action.shapes.length === 0) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: [...document.shapes, ...action.shapes.map(cloneShape)],
+      };
+    }
+    case "deleteShapes": {
+      const nextShapes = document.shapes.filter((shape) => !action.shapeIds.includes(shape.id));
+
+      if (nextShapes.length === document.shapes.length) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: nextShapes,
+      };
+    }
     case "moveShapes": {
       let didChange = false;
 
@@ -150,6 +207,42 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
         shapes: nextShapes,
       };
     }
+    case "setShapeGroups": {
+      let didChange = false;
+
+      const nextShapes = document.shapes.map((shape) => {
+        if (!Object.hasOwn(action.groupIdsByShapeId, shape.id)) {
+          return shape;
+        }
+
+        const nextGroupId = action.groupIdsByShapeId[shape.id];
+
+        if (shape.groupId === nextGroupId) {
+          return shape;
+        }
+
+        didChange = true;
+
+        if (nextGroupId === undefined) {
+          const { groupId: _groupId, ...shapeWithoutGroup } = shape;
+          return shapeWithoutGroup;
+        }
+
+        return {
+          ...shape,
+          groupId: nextGroupId,
+        };
+      });
+
+      if (!didChange) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: nextShapes,
+      };
+    }
   }
 }
 
@@ -195,4 +288,16 @@ export function historyReducer(history: DocumentHistory, action: HistoryAction):
       };
     }
   }
+}
+
+function cloneShape(shape: Shape): Shape {
+  return {
+    ...shape,
+  };
+}
+
+function cloneDocument(document: CanvasDocument): CanvasDocument {
+  return {
+    shapes: document.shapes.map(cloneShape),
+  };
 }

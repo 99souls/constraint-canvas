@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import {
-  AlignBottomBox,
-  AlignHorizontalCenters,
-  AlignHorizontalSpacing,
-  AlignLeftBox,
-  AlignRightBox,
-  AlignTopBox,
-  AlignVerticalCenters,
-  AlignVerticalSpacing,
-  RedoAction,
-  UndoAction,
-} from "iconoir-react";
+import { CanvasToolbar } from "./CanvasToolbar";
+import { DocumentMenu } from "./DocumentMenu";
 import {
   clampZoom,
   clampRectSize,
@@ -23,15 +13,30 @@ import {
   type Rect,
   type ResizeHandle,
 } from "../lib/geometry";
+import { createEditorId } from "../lib/ids";
 import {
   alignShapes,
   distributeShapes,
   getOverlappingShapeIds,
   type AlignMode,
 } from "../lib/layout";
+import {
+  clearAutosave,
+  downloadDocument,
+  loadAutosave,
+  parseDocument,
+  saveAutosave,
+  type AutosaveSnapshot,
+} from "../lib/persistence";
+import {
+  duplicateShapes,
+  expandSelectionWithGroups,
+  getSelectedGroupIds,
+  getSelectionForShape,
+} from "../lib/selection";
 import { resolveMoveSnapping, type Guide } from "../lib/snapping";
 import type { Shape } from "./../types/Shape";
-import { createInitialHistoryState, historyReducer } from "../types/Document";
+import { createHistoryState, createInitialDocument, historyReducer } from "../types/Document";
 import type { Viewport } from "../types/Viewport";
 
 type InteractionState =
@@ -74,16 +79,22 @@ const RESIZE_HANDLES: ResizeHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "
 
 export default function Canvas() {
   const worldRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialAutosave = useMemo(() => loadAutosave(), []);
   const [history, dispatchHistory] = useReducer(
     historyReducer,
-    undefined,
-    createInitialHistoryState,
+    initialAutosave?.document ?? createInitialDocument(),
+    createHistoryState,
   );
   const [viewport, setViewport] = useState<Viewport>({
     panX: 0,
     panY: 0,
     zoom: 1,
   });
+  const [autosaveSnapshot, setAutosaveSnapshot] = useState<AutosaveSnapshot | null>(
+    initialAutosave,
+  );
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [interaction, setInteraction] = useState<InteractionState>({
     mode: "idle",
@@ -97,6 +108,22 @@ export default function Canvas() {
   const shapeMap = useMemo(() => {
     return new Map(document.shapes.map((shape) => [shape.id, shape]));
   }, [document.shapes]);
+
+  useEffect(() => {
+    setSelectedShapeIds((currentSelection) => {
+      const nextSelection = currentSelection.filter((shapeId) => shapeMap.has(shapeId));
+
+      return nextSelection.length === currentSelection.length ? currentSelection : nextSelection;
+    });
+  }, [shapeMap]);
+
+  useEffect(() => {
+    const nextAutosave = saveAutosave(document);
+
+    if (nextAutosave) {
+      setAutosaveSnapshot(nextAutosave);
+    }
+  }, [document]);
 
   const runUndo = useCallback(() => {
     if (interaction.mode !== "idle") {
@@ -114,36 +141,264 @@ export default function Canvas() {
     dispatchHistory({ type: "redo" });
   }, [interaction.mode]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (interaction.mode !== "idle") {
+  const runNewDocument = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    setSelectedShapeIds([]);
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "loadDocument",
+        document: createInitialDocument(),
+      },
+    });
+  }, [interaction.mode]);
+
+  const runExportDocument = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    downloadDocument(document);
+  }, [document, interaction.mode]);
+
+  const runImportDocument = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    fileInputRef.current?.click();
+  }, [interaction.mode]);
+
+  const runRestoreAutosave = useCallback(() => {
+    if (interaction.mode !== "idle" || !autosaveSnapshot) {
+      return;
+    }
+
+    setSelectedShapeIds([]);
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "loadDocument",
+        document: autosaveSnapshot.document,
+      },
+    });
+  }, [autosaveSnapshot, interaction.mode]);
+
+  const runClearAutosave = useCallback(() => {
+    clearAutosave();
+    setAutosaveSnapshot(null);
+  }, []);
+
+  const runDeleteSelection = useCallback(() => {
+    if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
+      return;
+    }
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "deleteShapes",
+        shapeIds: selectedShapeIds,
+      },
+    });
+    setSelectedShapeIds([]);
+  }, [interaction.mode, selectedShapeIds]);
+
+  const runDuplicateSelection = useCallback(() => {
+    if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
+      return;
+    }
+
+    const selectedShapes = document.shapes.filter((shape) => selectedShapeIds.includes(shape.id));
+
+    if (selectedShapes.length === 0) {
+      return;
+    }
+
+    const duplicatedShapes = duplicateShapes(selectedShapes, createEditorId);
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "addShapes",
+        shapes: duplicatedShapes,
+      },
+    });
+    setSelectedShapeIds(duplicatedShapes.map((shape) => shape.id));
+  }, [document.shapes, interaction.mode, selectedShapeIds]);
+
+  const runGroupSelection = useCallback(() => {
+    if (interaction.mode !== "idle" || selectedShapeIds.length < 2) {
+      return;
+    }
+
+    const nextGroupId = createEditorId("group");
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "setShapeGroups",
+        groupIdsByShapeId: Object.fromEntries(
+          selectedShapeIds.map((shapeId) => [shapeId, nextGroupId] as const),
+        ),
+      },
+    });
+  }, [interaction.mode, selectedShapeIds]);
+
+  const runUngroupSelection = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    const selectedGroupIds = getSelectedGroupIds(selectedShapeIds, document.shapes);
+
+    if (selectedGroupIds.length === 0) {
+      return;
+    }
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "setShapeGroups",
+        groupIdsByShapeId: Object.fromEntries(
+          document.shapes.flatMap((shape) => {
+            if (!shape.groupId || !selectedGroupIds.includes(shape.groupId)) {
+              return [];
+            }
+
+            return [[shape.id, undefined] as const];
+          }),
+        ),
+      },
+    });
+  }, [document.shapes, interaction.mode, selectedShapeIds]);
+
+  const runNudgeSelection = useCallback(
+    (deltaX: number, deltaY: number) => {
+      if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
         return;
       }
 
-      const hasUndoModifier = event.metaKey || event.ctrlKey;
+      dispatchHistory({
+        type: "document",
+        action: {
+          type: "moveShapes",
+          positions: Object.fromEntries(
+            document.shapes
+              .filter((shape) => selectedShapeIds.includes(shape.id))
+              .map((shape) => [shape.id, { x: shape.x + deltaX, y: shape.y + deltaY }] as const),
+          ),
+        },
+      });
+    },
+    [document.shapes, interaction.mode, selectedShapeIds],
+  );
 
-      if (hasUndoModifier && event.key.toLowerCase() === "a") {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (interaction.mode !== "idle" || isMenuOpen) {
+        return;
+      }
+
+      if (
+        event.target instanceof HTMLElement &&
+        (event.target.isContentEditable ||
+          ["BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(event.target.tagName))
+      ) {
+        return;
+      }
+
+      const hasCommandModifier = event.metaKey || event.ctrlKey;
+
+      if (hasCommandModifier && event.key.toLowerCase() === "a") {
         event.preventDefault();
         setSelectedShapeIds(document.shapes.map((shape) => shape.id));
         return;
       }
 
-      if (!hasUndoModifier || event.key.toLowerCase() !== "z") {
-        if (hasUndoModifier && event.key.toLowerCase() === "y") {
-          event.preventDefault();
-          runRedo();
+      if (hasCommandModifier) {
+        switch (event.key.toLowerCase()) {
+          case "d": {
+            event.preventDefault();
+            runDuplicateSelection();
+            return;
+          }
+          case "g": {
+            event.preventDefault();
+            if (event.shiftKey) {
+              runUngroupSelection();
+              return;
+            }
+
+            runGroupSelection();
+            return;
+          }
+          case "o": {
+            event.preventDefault();
+            runImportDocument();
+            return;
+          }
+          case "s": {
+            event.preventDefault();
+            runExportDocument();
+            return;
+          }
+          case "y": {
+            event.preventDefault();
+            runRedo();
+            return;
+          }
+          case "z": {
+            event.preventDefault();
+            if (event.shiftKey) {
+              runRedo();
+              return;
+            }
+
+            runUndo();
+            return;
+          }
         }
+      }
 
+      if (event.key === "Escape") {
+        setSelectedShapeIds([]);
         return;
       }
 
-      event.preventDefault();
-      if (event.shiftKey) {
-        runRedo();
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        runDeleteSelection();
         return;
       }
 
-      runUndo();
+      const nudgeDistance = event.shiftKey ? 10 : 1;
+
+      switch (event.key) {
+        case "ArrowUp": {
+          event.preventDefault();
+          runNudgeSelection(0, -nudgeDistance);
+          return;
+        }
+        case "ArrowDown": {
+          event.preventDefault();
+          runNudgeSelection(0, nudgeDistance);
+          return;
+        }
+        case "ArrowLeft": {
+          event.preventDefault();
+          runNudgeSelection(-nudgeDistance, 0);
+          return;
+        }
+        case "ArrowRight": {
+          event.preventDefault();
+          runNudgeSelection(nudgeDistance, 0);
+          return;
+        }
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -151,7 +406,20 @@ export default function Canvas() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [document.shapes, interaction.mode, runRedo, runUndo]);
+  }, [
+    document.shapes,
+    interaction.mode,
+    isMenuOpen,
+    runDeleteSelection,
+    runDuplicateSelection,
+    runExportDocument,
+    runGroupSelection,
+    runImportDocument,
+    runNudgeSelection,
+    runRedo,
+    runUndo,
+    runUngroupSelection,
+  ]);
 
   const getLocalPoint = (clientX: number, clientY: number): Point => {
     const rect = worldRef.current?.getBoundingClientRect();
@@ -175,6 +443,33 @@ export default function Canvas() {
   const releasePointer = (pointerId: number) => {
     if (worldRef.current?.hasPointerCapture(pointerId)) {
       worldRef.current.releasePointerCapture(pointerId);
+    }
+  };
+
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const nextDocument = parseDocument(await file.text());
+
+      setSelectedShapeIds([]);
+      dispatchHistory({
+        type: "document",
+        action: {
+          type: "loadDocument",
+          document: nextDocument,
+        },
+      });
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "Unable to import the selected document.",
+      );
+    } finally {
+      event.currentTarget.value = "";
     }
   };
 
@@ -324,9 +619,12 @@ export default function Canvas() {
     const marqueeRect = makeRectFromPoints(interaction.startCanvasPoint, currentCanvasPoint);
 
     setSelectedShapeIds(
-      document.shapes
-        .filter((shape) => rectsIntersect(marqueeRect, shapeToRect(shape)))
-        .map((shape) => shape.id),
+      expandSelectionWithGroups(
+        document.shapes
+          .filter((shape) => rectsIntersect(marqueeRect, shapeToRect(shape)))
+          .map((shape) => shape.id),
+        document.shapes,
+      ),
     );
     setInteraction({
       ...interaction,
@@ -378,10 +676,24 @@ export default function Canvas() {
 
     e.stopPropagation();
 
+    const shapeSelection = getSelectionForShape(shapeId, document.shapes);
+
     if (e.shiftKey) {
-      setSelectedShapeIds((current) =>
-        current.includes(shapeId) ? current.filter((id) => id !== shapeId) : [...current, shapeId],
-      );
+      setSelectedShapeIds((currentSelection) => {
+        const expandedSelection = expandSelectionWithGroups(currentSelection, document.shapes);
+        const isEntireSelectionActive = shapeSelection.every((selectedId) =>
+          expandedSelection.includes(selectedId),
+        );
+
+        if (isEntireSelectionActive) {
+          return expandedSelection.filter((selectedId) => !shapeSelection.includes(selectedId));
+        }
+
+        return expandSelectionWithGroups(
+          [...expandedSelection, ...shapeSelection],
+          document.shapes,
+        );
+      });
 
       return;
     }
@@ -392,7 +704,11 @@ export default function Canvas() {
       return;
     }
 
-    const nextSelectedIds = selectedShapeIds.includes(shapeId) ? selectedShapeIds : [shapeId];
+    const nextSelectedIds = shapeSelection.every((selectedId) =>
+      selectedShapeIds.includes(selectedId),
+    )
+      ? selectedShapeIds
+      : shapeSelection;
     const startShapePositions = Object.fromEntries(
       nextSelectedIds.flatMap((selectedId) => {
         const selectedShape = shapeMap.get(selectedId);
@@ -527,10 +843,20 @@ export default function Canvas() {
   const selectedShapes = renderedShapes.filter((shape) => selectedShapeIds.includes(shape.id));
   const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : null;
   const overlappingShapeIds = getOverlappingShapeIds(renderedShapes);
+  const selectedGroupIds = getSelectedGroupIds(selectedShapeIds, document.shapes);
+  const canEditSelection = selectedShapeIds.length > 0 && interaction.mode === "idle";
   const canAlign = selectedShapeIds.length >= 2 && interaction.mode === "idle";
   const canDistribute = selectedShapeIds.length >= 3 && interaction.mode === "idle";
+  const canGroup = selectedShapeIds.length >= 2 && interaction.mode === "idle";
+  const canUngroup = selectedGroupIds.length > 0 && interaction.mode === "idle";
   const canUndo = history.past.length > 0 && interaction.mode === "idle";
   const canRedo = history.future.length > 0 && interaction.mode === "idle";
+  const autosaveLabel = autosaveSnapshot
+    ? `Autosaved ${new Date(autosaveSnapshot.savedAt).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })}`
+    : "No autosave available";
 
   return (
     <div
@@ -546,6 +872,31 @@ export default function Canvas() {
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
     >
+      <DocumentMenu
+        autosaveLabel={autosaveLabel}
+        canRestoreAutosave={Boolean(autosaveSnapshot)}
+        canEditSelection={canEditSelection}
+        canGroup={canGroup}
+        canUngroup={canUngroup}
+        onOpenChange={setIsMenuOpen}
+        onNewDocument={runNewDocument}
+        onExportDocument={runExportDocument}
+        onImportDocument={runImportDocument}
+        onRestoreAutosave={runRestoreAutosave}
+        onClearAutosave={runClearAutosave}
+        onDuplicateSelection={runDuplicateSelection}
+        onDeleteSelection={runDeleteSelection}
+        onGroupSelection={runGroupSelection}
+        onUngroupSelection={runUngroupSelection}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="application/json"
+        className="visually-hidden"
+        onChange={handleImportFileChange}
+      />
+
       <div
         className="screen"
         onWheel={handleWheel}
@@ -639,114 +990,16 @@ export default function Canvas() {
         </g>
       </svg>
 
-      <div
-        className="toolbar"
-        aria-label="Canvas toolbar"
-        onPointerDown={(event) => event.stopPropagation()}
-      >
-        <div className="toolbar-group" role="group" aria-label="History">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={runUndo}
-            disabled={!canUndo}
-            title="Undo (⌘Z)"
-          >
-            <UndoAction />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={runRedo}
-            disabled={!canRedo}
-            title="Redo (⌘⇧Z)"
-          >
-            <RedoAction />
-          </button>
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-group" role="group" aria-label="Alignment">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("left")}
-            disabled={!canAlign}
-            title="Align Left"
-          >
-            <AlignLeftBox />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("right")}
-            disabled={!canAlign}
-            title="Align Right"
-          >
-            <AlignRightBox />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("top")}
-            disabled={!canAlign}
-            title="Align Top"
-          >
-            <AlignTopBox />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("bottom")}
-            disabled={!canAlign}
-            title="Align Bottom"
-          >
-            <AlignBottomBox />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("horizontal-center")}
-            disabled={!canAlign}
-            title="Center Horizontally"
-          >
-            <AlignHorizontalCenters />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runAlignAction("vertical-center")}
-            disabled={!canAlign}
-            title="Center Vertically"
-          >
-            <AlignVerticalCenters />
-          </button>
-        </div>
-
-        <div className="toolbar-divider" />
-
-        <div className="toolbar-group" role="group" aria-label="Distribution">
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runDistributeAction("horizontal")}
-            disabled={!canDistribute}
-            title="Distribute Horizontally"
-          >
-            <AlignHorizontalSpacing />
-          </button>
-          <button
-            type="button"
-            className="toolbar-button"
-            onClick={() => runDistributeAction("vertical")}
-            disabled={!canDistribute}
-            title="Distribute Vertically"
-          >
-            <AlignVerticalSpacing />
-          </button>
-        </div>
-      </div>
+      <CanvasToolbar
+        canUndo={canUndo}
+        canRedo={canRedo}
+        canAlign={canAlign}
+        canDistribute={canDistribute}
+        onUndo={runUndo}
+        onRedo={runRedo}
+        onAlign={runAlignAction}
+        onDistribute={runDistributeAction}
+      />
     </div>
   );
 }

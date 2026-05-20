@@ -64,6 +64,6 @@ describe("layout helpers", () => {
       shapes[2],
     ]);
 
-    expect(overlapping.sort()).toEqual(["a", "d"]);
+    expect(overlapping.toSorted()).toEqual(["a", "d"]);
   });
 });

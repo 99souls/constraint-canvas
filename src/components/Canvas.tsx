@@ -1,4 +1,16 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import {
+  AlignBottomBox,
+  AlignHorizontalCenters,
+  AlignHorizontalSpacing,
+  AlignLeftBox,
+  AlignRightBox,
+  AlignTopBox,
+  AlignVerticalCenters,
+  AlignVerticalSpacing,
+  RedoAction,
+  UndoAction,
+} from "iconoir-react";
 import {
   clampZoom,
   clampRectSize,
@@ -86,6 +98,22 @@ export default function Canvas() {
     return new Map(document.shapes.map((shape) => [shape.id, shape]));
   }, [document.shapes]);
 
+  const runUndo = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    dispatchHistory({ type: "undo" });
+  }, [interaction.mode]);
+
+  const runRedo = useCallback(() => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    dispatchHistory({ type: "redo" });
+  }, [interaction.mode]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (interaction.mode !== "idle") {
@@ -103,16 +131,19 @@ export default function Canvas() {
       if (!hasUndoModifier || event.key.toLowerCase() !== "z") {
         if (hasUndoModifier && event.key.toLowerCase() === "y") {
           event.preventDefault();
-          setInteraction({ mode: "idle" });
-          dispatchHistory({ type: "redo" });
+          runRedo();
         }
 
         return;
       }
 
       event.preventDefault();
-      setInteraction({ mode: "idle" });
-      dispatchHistory({ type: event.shiftKey ? "redo" : "undo" });
+      if (event.shiftKey) {
+        runRedo();
+        return;
+      }
+
+      runUndo();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -120,7 +151,7 @@ export default function Canvas() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [document.shapes, interaction.mode]);
+  }, [document.shapes, interaction.mode, runRedo, runUndo]);
 
   const getLocalPoint = (clientX: number, clientY: number): Point => {
     const rect = worldRef.current?.getBoundingClientRect();
@@ -498,6 +529,8 @@ export default function Canvas() {
   const overlappingShapeIds = getOverlappingShapeIds(renderedShapes);
   const canAlign = selectedShapeIds.length >= 2 && interaction.mode === "idle";
   const canDistribute = selectedShapeIds.length >= 3 && interaction.mode === "idle";
+  const canUndo = history.past.length > 0 && interaction.mode === "idle";
+  const canRedo = history.future.length > 0 && interaction.mode === "idle";
 
   return (
     <div
@@ -606,58 +639,113 @@ export default function Canvas() {
         </g>
       </svg>
 
-      <div className="hud">
-        <span>zoom {viewport.zoom.toFixed(2)}x</span>
-        <span>selected {selectedShapeIds.length > 0 ? selectedShapeIds.join(",") : "none"}</span>
-        <span>mode {interaction.mode}</span>
-        <span>
-          history {history.past.length}/{history.future.length}
-        </span>
-        <span>shift+drag marquee</span>
-        <span>cmd/ctrl+z undo</span>
-      </div>
+      <div
+        className="toolbar"
+        aria-label="Canvas toolbar"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <div className="toolbar-group" role="group" aria-label="History">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={runUndo}
+            disabled={!canUndo}
+            title="Undo (⌘Z)"
+          >
+            <UndoAction />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={runRedo}
+            disabled={!canRedo}
+            title="Redo (⌘⇧Z)"
+          >
+            <RedoAction />
+          </button>
+        </div>
 
-      <div className="toolbar" onPointerDown={(event) => event.stopPropagation()}>
-        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("left")}>
-          Align Left
-        </button>
-        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("right")}>
-          Align Right
-        </button>
-        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("top")}>
-          Align Top
-        </button>
-        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("bottom")}>
-          Align Bottom
-        </button>
-        <button
-          type="button"
-          disabled={!canAlign}
-          onClick={() => runAlignAction("horizontal-center")}
-        >
-          Center X
-        </button>
-        <button
-          type="button"
-          disabled={!canAlign}
-          onClick={() => runAlignAction("vertical-center")}
-        >
-          Center Y
-        </button>
-        <button
-          type="button"
-          disabled={!canDistribute}
-          onClick={() => runDistributeAction("horizontal")}
-        >
-          Distribute X
-        </button>
-        <button
-          type="button"
-          disabled={!canDistribute}
-          onClick={() => runDistributeAction("vertical")}
-        >
-          Distribute Y
-        </button>
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-group" role="group" aria-label="Alignment">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("left")}
+            disabled={!canAlign}
+            title="Align Left"
+          >
+            <AlignLeftBox />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("right")}
+            disabled={!canAlign}
+            title="Align Right"
+          >
+            <AlignRightBox />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("top")}
+            disabled={!canAlign}
+            title="Align Top"
+          >
+            <AlignTopBox />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("bottom")}
+            disabled={!canAlign}
+            title="Align Bottom"
+          >
+            <AlignBottomBox />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("horizontal-center")}
+            disabled={!canAlign}
+            title="Center Horizontally"
+          >
+            <AlignHorizontalCenters />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runAlignAction("vertical-center")}
+            disabled={!canAlign}
+            title="Center Vertically"
+          >
+            <AlignVerticalCenters />
+          </button>
+        </div>
+
+        <div className="toolbar-divider" />
+
+        <div className="toolbar-group" role="group" aria-label="Distribution">
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runDistributeAction("horizontal")}
+            disabled={!canDistribute}
+            title="Distribute Horizontally"
+          >
+            <AlignHorizontalSpacing />
+          </button>
+          <button
+            type="button"
+            className="toolbar-button"
+            onClick={() => runDistributeAction("vertical")}
+            disabled={!canDistribute}
+            title="Distribute Vertically"
+          >
+            <AlignVerticalSpacing />
+          </button>
+        </div>
       </div>
     </div>
   );

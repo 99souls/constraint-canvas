@@ -1,19 +1,25 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   clampZoom,
+  clampRectSize,
   makeRectFromPoints,
   rectsIntersect,
+  resizeRect,
   screenToCanvas,
   translatePoint,
   type Point,
   type Rect,
+  type ResizeHandle,
 } from "../lib/geometry";
+import {
+  alignShapes,
+  distributeShapes,
+  getOverlappingShapeIds,
+  type AlignMode,
+} from "../lib/layout";
 import { resolveMoveSnapping, type Guide } from "../lib/snapping";
 import type { Shape } from "./../types/Shape";
-import {
-  createInitialHistoryState,
-  historyReducer,
-} from "../types/Document";
+import { createInitialHistoryState, historyReducer } from "../types/Document";
 import type { Viewport } from "../types/Viewport";
 
 type InteractionState =
@@ -39,7 +45,20 @@ type InteractionState =
       pointerId: number;
       startCanvasPoint: Point;
       currentCanvasPoint: Point;
+    }
+  | {
+      mode: "resizing-shape";
+      pointerId: number;
+      shapeId: string;
+      handle: ResizeHandle;
+      startCanvasPoint: Point;
+      startRect: Rect;
+      previewRect: Rect;
     };
+
+const MIN_SHAPE_WIDTH = 56;
+const MIN_SHAPE_HEIGHT = 56;
+const RESIZE_HANDLES: ResizeHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 export default function Canvas() {
   const worldRef = useRef<HTMLDivElement | null>(null);
@@ -60,6 +79,7 @@ export default function Canvas() {
 
   const isPanning = interaction.mode === "panning";
   const isDraggingShape = interaction.mode === "dragging-shapes";
+  const isResizingShape = interaction.mode === "resizing-shape";
   const document = history.present;
 
   const shapeMap = useMemo(() => {
@@ -73,6 +93,12 @@ export default function Canvas() {
       }
 
       const hasUndoModifier = event.metaKey || event.ctrlKey;
+
+      if (hasUndoModifier && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setSelectedShapeIds(document.shapes.map((shape) => shape.id));
+        return;
+      }
 
       if (!hasUndoModifier || event.key.toLowerCase() !== "z") {
         if (hasUndoModifier && event.key.toLowerCase() === "y") {
@@ -94,7 +120,7 @@ export default function Canvas() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [interaction.mode]);
+  }, [document.shapes, interaction.mode]);
 
   const getLocalPoint = (clientX: number, clientY: number): Point => {
     const rect = worldRef.current?.getBoundingClientRect();
@@ -143,10 +169,7 @@ export default function Canvas() {
     capturePointer(e.pointerId);
 
     if (e.shiftKey) {
-      const startCanvasPoint = screenToCanvas(
-        getLocalPoint(e.clientX, e.clientY),
-        viewport,
-      );
+      const startCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
 
       setInteraction({
         mode: "marquee",
@@ -190,10 +213,7 @@ export default function Canvas() {
     }
 
     if (interaction.mode === "dragging-shapes") {
-      const currentCanvasPoint = screenToCanvas(
-        getLocalPoint(e.clientX, e.clientY),
-        viewport,
-      );
+      const currentCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
       const dx = currentCanvasPoint.x - interaction.startCanvasPoint.x;
       const dy = currentCanvasPoint.y - interaction.startCanvasPoint.y;
       const leadShape = shapeMap.get(interaction.leadShapeId);
@@ -202,8 +222,7 @@ export default function Canvas() {
         return;
       }
 
-      const leadStartPosition =
-        interaction.startShapePositions[interaction.leadShapeId];
+      const leadStartPosition = interaction.startShapePositions[interaction.leadShapeId];
 
       if (!leadStartPosition) {
         return;
@@ -237,12 +256,7 @@ export default function Canvas() {
             return [];
           }
 
-          return [
-            [
-              shapeId,
-              translatePoint(startPosition, snappedDx, snappedDy),
-            ] as const,
-          ];
+          return [[shapeId, translatePoint(startPosition, snappedDx, snappedDy)] as const];
         }),
       );
 
@@ -255,14 +269,28 @@ export default function Canvas() {
       return;
     }
 
-    const currentCanvasPoint = screenToCanvas(
-      getLocalPoint(e.clientX, e.clientY),
-      viewport,
-    );
-    const marqueeRect = makeRectFromPoints(
-      interaction.startCanvasPoint,
-      currentCanvasPoint,
-    );
+    if (interaction.mode === "resizing-shape") {
+      const currentCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
+      const deltaX = currentCanvasPoint.x - interaction.startCanvasPoint.x;
+      const deltaY = currentCanvasPoint.y - interaction.startCanvasPoint.y;
+
+      setInteraction({
+        ...interaction,
+        previewRect: resizeRect(
+          interaction.startRect,
+          interaction.handle,
+          deltaX,
+          deltaY,
+          MIN_SHAPE_WIDTH,
+          MIN_SHAPE_HEIGHT,
+        ),
+      });
+
+      return;
+    }
+
+    const currentCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
+    const marqueeRect = makeRectFromPoints(interaction.startCanvasPoint, currentCanvasPoint);
 
     setSelectedShapeIds(
       document.shapes
@@ -288,6 +316,15 @@ export default function Canvas() {
           positions: interaction.previewPositions,
         },
       });
+    } else if (interaction.mode === "resizing-shape") {
+      dispatchHistory({
+        type: "document",
+        action: {
+          type: "resizeShape",
+          shapeId: interaction.shapeId,
+          rect: clampRectSize(interaction.previewRect, MIN_SHAPE_WIDTH, MIN_SHAPE_HEIGHT),
+        },
+      });
     }
 
     releasePointer(e.pointerId);
@@ -303,10 +340,7 @@ export default function Canvas() {
     setInteraction({ mode: "idle" });
   };
 
-  const handleShapePointerDown = (
-    e: React.PointerEvent<HTMLDivElement>,
-    shapeId: string,
-  ) => {
+  const handleShapePointerDown = (e: React.PointerEvent<HTMLDivElement>, shapeId: string) => {
     if (e.button !== 0) {
       return;
     }
@@ -315,9 +349,7 @@ export default function Canvas() {
 
     if (e.shiftKey) {
       setSelectedShapeIds((current) =>
-        current.includes(shapeId)
-          ? current.filter((id) => id !== shapeId)
-          : [...current, shapeId],
+        current.includes(shapeId) ? current.filter((id) => id !== shapeId) : [...current, shapeId],
       );
 
       return;
@@ -329,9 +361,7 @@ export default function Canvas() {
       return;
     }
 
-    const nextSelectedIds = selectedShapeIds.includes(shapeId)
-      ? selectedShapeIds
-      : [shapeId];
+    const nextSelectedIds = selectedShapeIds.includes(shapeId) ? selectedShapeIds : [shapeId];
     const startShapePositions = Object.fromEntries(
       nextSelectedIds.flatMap((selectedId) => {
         const selectedShape = shapeMap.get(selectedId);
@@ -340,9 +370,7 @@ export default function Canvas() {
           return [];
         }
 
-        return [
-          [selectedId, { x: selectedShape.x, y: selectedShape.y }] as const,
-        ];
+        return [[selectedId, { x: selectedShape.x, y: selectedShape.y }] as const];
       }),
     );
 
@@ -353,13 +381,79 @@ export default function Canvas() {
       pointerId: e.pointerId,
       leadShapeId: shapeId,
       shapeIds: nextSelectedIds,
-      startCanvasPoint: screenToCanvas(
-        getLocalPoint(e.clientX, e.clientY),
-        viewport,
-      ),
+      startCanvasPoint: screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport),
       startShapePositions,
       previewPositions: startShapePositions,
       guides: [],
+    });
+  };
+
+  const handleResizeHandlePointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    shapeId: string,
+    handle: ResizeHandle,
+  ) => {
+    if (e.button !== 0) {
+      return;
+    }
+
+    e.stopPropagation();
+
+    const shape = shapeMap.get(shapeId);
+
+    if (!shape) {
+      return;
+    }
+
+    capturePointer(e.pointerId);
+    setInteraction({
+      mode: "resizing-shape",
+      pointerId: e.pointerId,
+      shapeId,
+      handle,
+      startCanvasPoint: screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport),
+      startRect: shapeToRect(shape),
+      previewRect: shapeToRect(shape),
+    });
+  };
+
+  const runAlignAction = (mode: AlignMode) => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    const selectedShapes = document.shapes.filter((shape) => selectedShapeIds.includes(shape.id));
+
+    if (selectedShapes.length < 2) {
+      return;
+    }
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "moveShapes",
+        positions: alignShapes(selectedShapes, mode),
+      },
+    });
+  };
+
+  const runDistributeAction = (axis: "horizontal" | "vertical") => {
+    if (interaction.mode !== "idle") {
+      return;
+    }
+
+    const selectedShapes = document.shapes.filter((shape) => selectedShapeIds.includes(shape.id));
+
+    if (selectedShapes.length < 3) {
+      return;
+    }
+
+    dispatchHistory({
+      type: "document",
+      action: {
+        type: "moveShapes",
+        positions: distributeShapes(selectedShapes, axis),
+      },
     });
   };
 
@@ -369,24 +463,41 @@ export default function Canvas() {
 
       if (previewPosition) {
         return {
-          ...shape,
+          id: shape.id,
+          type: shape.type,
+          width: shape.width,
+          height: shape.height,
+          color: shape.color,
           x: previewPosition.x,
           y: previewPosition.y,
         };
       }
     }
 
+    if (interaction.mode === "resizing-shape" && interaction.shapeId === shape.id) {
+      return {
+        id: shape.id,
+        type: shape.type,
+        color: shape.color,
+        x: interaction.previewRect.x,
+        y: interaction.previewRect.y,
+        width: interaction.previewRect.width,
+        height: interaction.previewRect.height,
+      };
+    }
+
     return shape;
   });
-  const activeGuides =
-    interaction.mode === "dragging-shapes" ? interaction.guides : [];
+  const activeGuides = interaction.mode === "dragging-shapes" ? interaction.guides : [];
   const marqueeRect =
     interaction.mode === "marquee"
-      ? makeRectFromPoints(
-          interaction.startCanvasPoint,
-          interaction.currentCanvasPoint,
-        )
+      ? makeRectFromPoints(interaction.startCanvasPoint, interaction.currentCanvasPoint)
       : null;
+  const selectedShapes = renderedShapes.filter((shape) => selectedShapeIds.includes(shape.id));
+  const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+  const overlappingShapeIds = getOverlappingShapeIds(renderedShapes);
+  const canAlign = selectedShapeIds.length >= 2 && interaction.mode === "idle";
+  const canDistribute = selectedShapeIds.length >= 3 && interaction.mode === "idle";
 
   return (
     <div
@@ -395,7 +506,7 @@ export default function Canvas() {
       style={{
         backgroundPosition: `${viewport.panX}px ${viewport.panY}px`,
         backgroundSize: `${40 * viewport.zoom}px ${40 * viewport.zoom}px`,
-        cursor: isPanning || isDraggingShape ? "grabbing" : "grab",
+        cursor: isPanning || isDraggingShape || isResizingShape ? "grabbing" : "grab",
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -413,9 +524,12 @@ export default function Canvas() {
           <div
             key={"shape" + shape.id}
             className={`shape${selectedShapeIds.includes(shape.id) ? " is-selected" : ""}${
-              interaction.mode === "dragging-shapes" &&
-              interaction.shapeIds.includes(shape.id)
+              interaction.mode === "dragging-shapes" && interaction.shapeIds.includes(shape.id)
                 ? " is-dragging"
+                : ""
+            }${overlappingShapeIds.includes(shape.id) ? " is-overlapping" : ""}${
+              interaction.mode === "resizing-shape" && interaction.shapeId === shape.id
+                ? " is-resizing"
                 : ""
             }`}
             style={{
@@ -428,17 +542,37 @@ export default function Canvas() {
             onPointerDown={(e) => handleShapePointerDown(e, shape.id)}
           />
         ))}
+
+        {singleSelectedShape ? (
+          <div
+            className="selection-frame"
+            style={{
+              left: singleSelectedShape.x,
+              top: singleSelectedShape.y,
+              width: singleSelectedShape.width,
+              height: singleSelectedShape.height,
+            }}
+          >
+            {RESIZE_HANDLES.map((handle) => (
+              <div
+                key={handle}
+                className={`resize-handle resize-handle-${handle}`}
+                onPointerDown={(e) =>
+                  handleResizeHandlePointerDown(e, singleSelectedShape.id, handle)
+                }
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <svg className="overlay" aria-hidden="true">
-        <g
-          transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}
-        >
-          {activeGuides.map((guide, index) => {
+        <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
+          {activeGuides.map((guide) => {
             if (guide.orientation === "vertical") {
               return (
                 <line
-                  key={`guide-${index}`}
+                  key={`guide-v-${guide.x}-${guide.y1}-${guide.y2}`}
                   className="snap-guide"
                   x1={guide.x}
                   x2={guide.x}
@@ -450,7 +584,7 @@ export default function Canvas() {
 
             return (
               <line
-                key={`guide-${index}`}
+                key={`guide-h-${guide.y}-${guide.x1}-${guide.x2}`}
                 className="snap-guide"
                 x1={guide.x1}
                 x2={guide.x2}
@@ -474,16 +608,56 @@ export default function Canvas() {
 
       <div className="hud">
         <span>zoom {viewport.zoom.toFixed(2)}x</span>
-        <span>
-          selected{" "}
-          {selectedShapeIds.length > 0 ? selectedShapeIds.join(",") : "none"}
-        </span>
+        <span>selected {selectedShapeIds.length > 0 ? selectedShapeIds.join(",") : "none"}</span>
         <span>mode {interaction.mode}</span>
         <span>
           history {history.past.length}/{history.future.length}
         </span>
         <span>shift+drag marquee</span>
         <span>cmd/ctrl+z undo</span>
+      </div>
+
+      <div className="toolbar" onPointerDown={(event) => event.stopPropagation()}>
+        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("left")}>
+          Align Left
+        </button>
+        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("right")}>
+          Align Right
+        </button>
+        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("top")}>
+          Align Top
+        </button>
+        <button type="button" disabled={!canAlign} onClick={() => runAlignAction("bottom")}>
+          Align Bottom
+        </button>
+        <button
+          type="button"
+          disabled={!canAlign}
+          onClick={() => runAlignAction("horizontal-center")}
+        >
+          Center X
+        </button>
+        <button
+          type="button"
+          disabled={!canAlign}
+          onClick={() => runAlignAction("vertical-center")}
+        >
+          Center Y
+        </button>
+        <button
+          type="button"
+          disabled={!canDistribute}
+          onClick={() => runDistributeAction("horizontal")}
+        >
+          Distribute X
+        </button>
+        <button
+          type="button"
+          disabled={!canDistribute}
+          onClick={() => runDistributeAction("vertical")}
+        >
+          Distribute Y
+        </button>
       </div>
     </div>
   );

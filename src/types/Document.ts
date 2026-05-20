@@ -9,7 +9,13 @@ export type MoveShapesAction = {
   positions: Record<string, { x: number; y: number }>;
 };
 
-export type DocumentAction = MoveShapesAction;
+export type ResizeShapeAction = {
+  type: "resizeShape";
+  shapeId: string;
+  rect: { x: number; y: number; width: number; height: number };
+};
+
+export type DocumentAction = MoveShapesAction | ResizeShapeAction;
 
 export type DocumentHistory = {
   past: CanvasDocument[];
@@ -73,10 +79,7 @@ export function createInitialHistoryState(): DocumentHistory {
   };
 }
 
-export function documentReducer(
-  document: CanvasDocument,
-  action: DocumentAction,
-): CanvasDocument {
+export function documentReducer(document: CanvasDocument, action: DocumentAction): CanvasDocument {
   switch (action.type) {
     case "moveShapes": {
       let didChange = false;
@@ -110,13 +113,47 @@ export function documentReducer(
         shapes: nextShapes,
       };
     }
+    case "resizeShape": {
+      let didChange = false;
+
+      const nextShapes = document.shapes.map((shape) => {
+        if (shape.id !== action.shapeId) {
+          return shape;
+        }
+
+        if (
+          shape.x === action.rect.x &&
+          shape.y === action.rect.y &&
+          shape.width === action.rect.width &&
+          shape.height === action.rect.height
+        ) {
+          return shape;
+        }
+
+        didChange = true;
+
+        return {
+          ...shape,
+          x: action.rect.x,
+          y: action.rect.y,
+          width: action.rect.width,
+          height: action.rect.height,
+        };
+      });
+
+      if (!didChange) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: nextShapes,
+      };
+    }
   }
 }
 
-export function historyReducer(
-  history: DocumentHistory,
-  action: HistoryAction,
-): DocumentHistory {
+export function historyReducer(history: DocumentHistory, action: HistoryAction): DocumentHistory {
   switch (action.type) {
     case "document": {
       const nextDocument = documentReducer(history.present, action.action);

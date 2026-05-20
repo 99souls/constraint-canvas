@@ -12,6 +12,8 @@ export type Rect = {
   height: number;
 };
 
+export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
 export function clampZoom(zoom: number): number {
   return Math.min(2.5, Math.max(0.4, zoom));
 }
@@ -47,17 +49,57 @@ export function makeRectFromPoints(start: Point, end: Point): Rect {
 }
 
 export function rectsIntersect(a: Rect, b: Rect): boolean {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 export function getRectCenter(rect: Rect): Point {
   return {
     x: rect.x + rect.width / 2,
     y: rect.y + rect.height / 2,
+  };
+}
+
+export function clampRectSize(rect: Rect, minimumWidth: number, minimumHeight: number): Rect {
+  return {
+    ...rect,
+    width: Math.max(minimumWidth, rect.width),
+    height: Math.max(minimumHeight, rect.height),
+  };
+}
+
+export function resizeRect(
+  rect: Rect,
+  handle: ResizeHandle,
+  deltaX: number,
+  deltaY: number,
+  minimumWidth: number,
+  minimumHeight: number,
+): Rect {
+  let nextLeft = rect.x;
+  let nextTop = rect.y;
+  let nextRight = rect.x + rect.width;
+  let nextBottom = rect.y + rect.height;
+
+  if (handle.includes("w")) {
+    nextLeft = Math.min(nextLeft + deltaX, nextRight - minimumWidth);
+  }
+
+  if (handle.includes("e")) {
+    nextRight = Math.max(nextRight + deltaX, nextLeft + minimumWidth);
+  }
+
+  if (handle.includes("n")) {
+    nextTop = Math.min(nextTop + deltaY, nextBottom - minimumHeight);
+  }
+
+  if (handle.includes("s")) {
+    nextBottom = Math.max(nextBottom + deltaY, nextTop + minimumHeight);
+  }
+
+  return {
+    x: nextLeft,
+    y: nextTop,
+    width: nextRight - nextLeft,
+    height: nextBottom - nextTop,
   };
 }

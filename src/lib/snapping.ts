@@ -30,18 +30,12 @@ type ResolveMoveSnappingResult = {
   guides: Guide[];
 };
 
-export function resolveMoveSnapping(
-  input: ResolveMoveSnappingInput,
-): ResolveMoveSnappingResult {
+export function resolveMoveSnapping(input: ResolveMoveSnappingInput): ResolveMoveSnappingResult {
   const vertical = pickClosestCandidate(
     collectVerticalCandidates(input.movingRect, input.stationaryRects, input.threshold),
   );
   const horizontal = pickClosestCandidate(
-    collectHorizontalCandidates(
-      input.movingRect,
-      input.stationaryRects,
-      input.threshold,
-    ),
+    collectHorizontalCandidates(input.movingRect, input.stationaryRects, input.threshold),
   );
 
   return {
@@ -49,9 +43,7 @@ export function resolveMoveSnapping(
       x: input.movingRect.x + (vertical?.delta ?? 0),
       y: input.movingRect.y + (horizontal?.delta ?? 0),
     },
-    guides: [vertical?.guide, horizontal?.guide].filter(
-      (guide): guide is Guide => Boolean(guide),
-    ),
+    guides: [vertical?.guide, horizontal?.guide].filter((guide): guide is Guide => Boolean(guide)),
   };
 }
 
@@ -131,16 +123,12 @@ function collectHorizontalCandidates(
   });
 }
 
-function pickClosestCandidate(
-  candidates: SnapCandidate[],
-): SnapCandidate | undefined {
+function pickClosestCandidate(candidates: SnapCandidate[]): SnapCandidate | undefined {
   return candidates.reduce<SnapCandidate | undefined>((closest, candidate) => {
     if (!closest) {
       return candidate;
     }
 
-    return Math.abs(candidate.delta) < Math.abs(closest.delta)
-      ? candidate
-      : closest;
+    return Math.abs(candidate.delta) < Math.abs(closest.delta) ? candidate : closest;
   }, undefined);
 }

@@ -9,7 +9,8 @@
     "start": "NODE_ENV=production bun src/index.ts",
     "lint": "oxlint --report-unused-disable-directives",
     "fmt": "oxfmt",
-    "fmt:check": "oxfmt --check"
+    "fmt:check": "oxfmt --check",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19",

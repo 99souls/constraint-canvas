@@ -92,6 +92,38 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
     ctx.stroke();
   }, [value, size, cx, cy, rOuter, rInner, squareSize, sqLeft, sqTop, sqRight, sqBottom]);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    let handled = false;
+    let { h, s, v } = value;
+    const step = e.shiftKey ? 10 : 1;
+    const svStep = e.shiftKey ? 0.1 : 0.02;
+
+    if (e.key === 'ArrowUp') {
+      v = Math.min(1, v + svStep);
+      handled = true;
+    } else if (e.key === 'ArrowDown') {
+      v = Math.max(0, v - svStep);
+      handled = true;
+    } else if (e.key === 'ArrowRight') {
+      s = Math.min(1, s + svStep);
+      handled = true;
+    } else if (e.key === 'ArrowLeft') {
+      s = Math.max(0, s - svStep);
+      handled = true;
+    } else if (e.key === 'PageUp') {
+      h = (h + step) % 360;
+      handled = true;
+    } else if (e.key === 'PageDown') {
+      h = (h - step + 360) % 360;
+      handled = true;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      onChange({ h, s, v });
+    }
+  };
+
   const handlePointer = (e: React.PointerEvent) => {
     if (!canvasRef.current) return;
     const rect = canvasRef.current.getBoundingClientRect();
@@ -104,7 +136,9 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
       dragTarget = determinePointerTarget(px, py, layout);
       if (dragTarget) {
         setActiveDrag(dragTarget);
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        if (canvasRef.current && !canvasRef.current.hasPointerCapture(e.pointerId)) {
+          canvasRef.current.setPointerCapture(e.pointerId);
+        }
       }
     }
 
@@ -118,27 +152,32 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
 
     if (e.type === 'pointerup' || e.type === 'pointercancel') {
       setActiveDrag(null);
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      if (canvasRef.current && canvasRef.current.hasPointerCapture(e.pointerId)) {
+        canvasRef.current.releasePointerCapture(e.pointerId);
+      }
     }
   };
 
   return (
     <canvas
       ref={canvasRef}
+      className="inspector-color-wheel"
       width={size}
       height={size}
-      tabIndex={-1}
+      tabIndex={0}
+      role="application"
+      aria-label="Color wheel. Use arrow keys to adjust saturation and brightness, PageUp and PageDown to adjust hue."
       style={{
         touchAction: 'none',
         cursor: 'crosshair',
         display: 'block',
         margin: '0 auto',
-        outline: 'none',
       }}
       onPointerDown={handlePointer}
       onPointerMove={activeDrag ? handlePointer : undefined}
       onPointerUp={activeDrag ? handlePointer : undefined}
       onPointerCancel={activeDrag ? handlePointer : undefined}
+      onKeyDown={handleKeyDown}
     />
   );
 }

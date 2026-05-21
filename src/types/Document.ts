@@ -1,37 +1,37 @@
-import type { Shape } from "./Shape";
+import type { Shape } from './Shape';
 
 export type CanvasDocument = {
   shapes: Shape[];
 };
 
 export type MoveShapesAction = {
-  type: "moveShapes";
+  type: 'moveShapes';
   positions: Record<string, { x: number; y: number }>;
 };
 
 export type AddShapesAction = {
-  type: "addShapes";
+  type: 'addShapes';
   shapes: Shape[];
 };
 
 export type DeleteShapesAction = {
-  type: "deleteShapes";
+  type: 'deleteShapes';
   shapeIds: string[];
 };
 
 export type ResizeShapeAction = {
-  type: "resizeShape";
+  type: 'resizeShape';
   shapeId: string;
   rect: { x: number; y: number; width: number; height: number };
 };
 
 export type SetShapeGroupsAction = {
-  type: "setShapeGroups";
+  type: 'setShapeGroups';
   groupIdsByShapeId: Record<string, string | undefined>;
 };
 
 export type LoadDocumentAction = {
-  type: "loadDocument";
+  type: 'loadDocument';
   document: CanvasDocument;
 };
 
@@ -51,43 +51,43 @@ export type DocumentHistory = {
 
 export type HistoryAction =
   | {
-      type: "document";
+      type: 'document';
       action: DocumentAction;
     }
   | {
-      type: "undo";
+      type: 'undo';
     }
   | {
-      type: "redo";
+      type: 'redo';
     };
 
 const INITIAL_SHAPES: Shape[] = [
   {
-    id: "1",
-    type: "rectangle",
+    id: '1',
+    type: 'rectangle',
     x: 150,
     y: 150,
     width: 200,
     height: 100,
-    color: "red",
+    color: 'red',
   },
   {
-    id: "2",
-    type: "rectangle",
+    id: '2',
+    type: 'rectangle',
     x: 1600,
     y: 900,
     width: 100,
     height: 100,
-    color: "blue",
+    color: 'blue',
   },
   {
-    id: "3",
-    type: "rectangle",
+    id: '3',
+    type: 'rectangle',
     x: 900,
     y: 500,
     width: 100,
     height: 200,
-    color: "green",
+    color: 'green',
   },
 ];
 
@@ -113,10 +113,10 @@ export function createInitialHistoryState(): DocumentHistory {
 
 export function documentReducer(document: CanvasDocument, action: DocumentAction): CanvasDocument {
   switch (action.type) {
-    case "loadDocument": {
+    case 'loadDocument': {
       return cloneDocument(action.document);
     }
-    case "addShapes": {
+    case 'addShapes': {
       if (action.shapes.length === 0) {
         return document;
       }
@@ -126,7 +126,7 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
         shapes: [...document.shapes, ...action.shapes.map(cloneShape)],
       };
     }
-    case "deleteShapes": {
+    case 'deleteShapes': {
       const nextShapes = document.shapes.filter((shape) => !action.shapeIds.includes(shape.id));
 
       if (nextShapes.length === document.shapes.length) {
@@ -138,7 +138,7 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
         shapes: nextShapes,
       };
     }
-    case "moveShapes": {
+    case 'moveShapes': {
       let didChange = false;
 
       const nextShapes = document.shapes.map((shape) => {
@@ -170,7 +170,7 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
         shapes: nextShapes,
       };
     }
-    case "resizeShape": {
+    case 'resizeShape': {
       let didChange = false;
 
       const nextShapes = document.shapes.map((shape) => {
@@ -207,7 +207,7 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
         shapes: nextShapes,
       };
     }
-    case "setShapeGroups": {
+    case 'setShapeGroups': {
       let didChange = false;
 
       const nextShapes = document.shapes.map((shape) => {
@@ -248,7 +248,7 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
 
 export function historyReducer(history: DocumentHistory, action: HistoryAction): DocumentHistory {
   switch (action.type) {
-    case "document": {
+    case 'document': {
       const nextDocument = documentReducer(history.present, action.action);
 
       if (nextDocument === history.present) {
@@ -261,7 +261,7 @@ export function historyReducer(history: DocumentHistory, action: HistoryAction):
         future: [],
       };
     }
-    case "undo": {
+    case 'undo': {
       const previous = history.past[history.past.length - 1];
 
       if (!previous) {
@@ -274,7 +274,7 @@ export function historyReducer(history: DocumentHistory, action: HistoryAction):
         future: [history.present, ...history.future],
       };
     }
-    case "redo": {
+    case 'redo': {
       const next = history.future[0];
 
       if (!next) {

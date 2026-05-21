@@ -1,14 +1,14 @@
-import { getRectCenter, type Point, type Rect } from "./geometry";
+import { getRectCenter, type Point, type Rect } from './geometry';
 
 export type Guide =
   | {
-      orientation: "vertical";
+      orientation: 'vertical';
       x: number;
       y1: number;
       y2: number;
     }
   | {
-      orientation: "horizontal";
+      orientation: 'horizontal';
       y: number;
       x1: number;
       x2: number;
@@ -73,7 +73,7 @@ function collectVerticalCandidates(
           {
             delta,
             guide: {
-              orientation: "vertical" as const,
+              orientation: 'vertical' as const,
               x: targetValue,
               y1: Math.min(movingRect.y, rect.y),
               y2: Math.max(movingRect.y + movingRect.height, rect.y + rect.height),
@@ -111,7 +111,7 @@ function collectHorizontalCandidates(
           {
             delta,
             guide: {
-              orientation: "horizontal" as const,
+              orientation: 'horizontal' as const,
               y: targetValue,
               x1: Math.min(movingRect.x, rect.x),
               x2: Math.max(movingRect.x + movingRect.width, rect.x + rect.width),

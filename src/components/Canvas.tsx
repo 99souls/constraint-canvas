@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { CanvasToolbar } from "./CanvasToolbar";
-import { DocumentMenu } from "./DocumentMenu";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+
 import {
   clampZoom,
   clampRectSize,
@@ -12,14 +11,14 @@ import {
   type Point,
   type Rect,
   type ResizeHandle,
-} from "../lib/geometry";
-import { createEditorId } from "../lib/ids";
+} from '../lib/geometry';
+import { createEditorId } from '../lib/ids';
 import {
   alignShapes,
   distributeShapes,
   getOverlappingShapeIds,
   type AlignMode,
-} from "../lib/layout";
+} from '../lib/layout';
 import {
   clearAutosave,
   downloadDocument,
@@ -27,28 +26,30 @@ import {
   parseDocument,
   saveAutosave,
   type AutosaveSnapshot,
-} from "../lib/persistence";
+} from '../lib/persistence';
 import {
   duplicateShapes,
   expandSelectionWithGroups,
   getSelectedGroupIds,
   getSelectionForShape,
-} from "../lib/selection";
-import { resolveMoveSnapping, type Guide } from "../lib/snapping";
-import type { Shape } from "./../types/Shape";
-import { createHistoryState, createInitialDocument, historyReducer } from "../types/Document";
-import type { Viewport } from "../types/Viewport";
+} from '../lib/selection';
+import { resolveMoveSnapping, type Guide } from '../lib/snapping';
+import { createHistoryState, createInitialDocument, historyReducer } from '../types/Document';
+import type { Viewport } from '../types/Viewport';
+import type { Shape } from './../types/Shape';
+import { CanvasToolbar } from './CanvasToolbar';
+import { DocumentMenu } from './DocumentMenu';
 
 type InteractionState =
-  | { mode: "idle" }
+  | { mode: 'idle' }
   | {
-      mode: "panning";
+      mode: 'panning';
       pointerId: number;
       startClientPoint: Point;
       startViewport: Viewport;
     }
   | {
-      mode: "dragging-shapes";
+      mode: 'dragging-shapes';
       pointerId: number;
       leadShapeId: string;
       shapeIds: string[];
@@ -58,13 +59,13 @@ type InteractionState =
       guides: Guide[];
     }
   | {
-      mode: "marquee";
+      mode: 'marquee';
       pointerId: number;
       startCanvasPoint: Point;
       currentCanvasPoint: Point;
     }
   | {
-      mode: "resizing-shape";
+      mode: 'resizing-shape';
       pointerId: number;
       shapeId: string;
       handle: ResizeHandle;
@@ -75,7 +76,7 @@ type InteractionState =
 
 const MIN_SHAPE_WIDTH = 56;
 const MIN_SHAPE_HEIGHT = 56;
-const RESIZE_HANDLES: ResizeHandle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+const RESIZE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 export default function Canvas() {
   const worldRef = useRef<HTMLDivElement | null>(null);
@@ -97,12 +98,12 @@ export default function Canvas() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([]);
   const [interaction, setInteraction] = useState<InteractionState>({
-    mode: "idle",
+    mode: 'idle',
   });
 
-  const isPanning = interaction.mode === "panning";
-  const isDraggingShape = interaction.mode === "dragging-shapes";
-  const isResizingShape = interaction.mode === "resizing-shape";
+  const isPanning = interaction.mode === 'panning';
+  const isDraggingShape = interaction.mode === 'dragging-shapes';
+  const isResizingShape = interaction.mode === 'resizing-shape';
   const document = history.present;
 
   const shapeMap = useMemo(() => {
@@ -126,38 +127,38 @@ export default function Canvas() {
   }, [document]);
 
   const runUndo = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
-    dispatchHistory({ type: "undo" });
+    dispatchHistory({ type: 'undo' });
   }, [interaction.mode]);
 
   const runRedo = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
-    dispatchHistory({ type: "redo" });
+    dispatchHistory({ type: 'redo' });
   }, [interaction.mode]);
 
   const runNewDocument = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
     setSelectedShapeIds([]);
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "loadDocument",
+        type: 'loadDocument',
         document: createInitialDocument(),
       },
     });
   }, [interaction.mode]);
 
   const runExportDocument = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
@@ -165,7 +166,7 @@ export default function Canvas() {
   }, [document, interaction.mode]);
 
   const runImportDocument = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
@@ -173,15 +174,15 @@ export default function Canvas() {
   }, [interaction.mode]);
 
   const runRestoreAutosave = useCallback(() => {
-    if (interaction.mode !== "idle" || !autosaveSnapshot) {
+    if (interaction.mode !== 'idle' || !autosaveSnapshot) {
       return;
     }
 
     setSelectedShapeIds([]);
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "loadDocument",
+        type: 'loadDocument',
         document: autosaveSnapshot.document,
       },
     });
@@ -193,14 +194,14 @@ export default function Canvas() {
   }, []);
 
   const runDeleteSelection = useCallback(() => {
-    if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
+    if (interaction.mode !== 'idle' || selectedShapeIds.length === 0) {
       return;
     }
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "deleteShapes",
+        type: 'deleteShapes',
         shapeIds: selectedShapeIds,
       },
     });
@@ -208,7 +209,7 @@ export default function Canvas() {
   }, [interaction.mode, selectedShapeIds]);
 
   const runDuplicateSelection = useCallback(() => {
-    if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
+    if (interaction.mode !== 'idle' || selectedShapeIds.length === 0) {
       return;
     }
 
@@ -221,9 +222,9 @@ export default function Canvas() {
     const duplicatedShapes = duplicateShapes(selectedShapes, createEditorId);
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "addShapes",
+        type: 'addShapes',
         shapes: duplicatedShapes,
       },
     });
@@ -231,16 +232,16 @@ export default function Canvas() {
   }, [document.shapes, interaction.mode, selectedShapeIds]);
 
   const runGroupSelection = useCallback(() => {
-    if (interaction.mode !== "idle" || selectedShapeIds.length < 2) {
+    if (interaction.mode !== 'idle' || selectedShapeIds.length < 2) {
       return;
     }
 
-    const nextGroupId = createEditorId("group");
+    const nextGroupId = createEditorId('group');
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "setShapeGroups",
+        type: 'setShapeGroups',
         groupIdsByShapeId: Object.fromEntries(
           selectedShapeIds.map((shapeId) => [shapeId, nextGroupId] as const),
         ),
@@ -249,7 +250,7 @@ export default function Canvas() {
   }, [interaction.mode, selectedShapeIds]);
 
   const runUngroupSelection = useCallback(() => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
@@ -260,9 +261,9 @@ export default function Canvas() {
     }
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "setShapeGroups",
+        type: 'setShapeGroups',
         groupIdsByShapeId: Object.fromEntries(
           document.shapes.flatMap((shape) => {
             if (!shape.groupId || !selectedGroupIds.includes(shape.groupId)) {
@@ -278,14 +279,14 @@ export default function Canvas() {
 
   const runNudgeSelection = useCallback(
     (deltaX: number, deltaY: number) => {
-      if (interaction.mode !== "idle" || selectedShapeIds.length === 0) {
+      if (interaction.mode !== 'idle' || selectedShapeIds.length === 0) {
         return;
       }
 
       dispatchHistory({
-        type: "document",
+        type: 'document',
         action: {
-          type: "moveShapes",
+          type: 'moveShapes',
           positions: Object.fromEntries(
             document.shapes
               .filter((shape) => selectedShapeIds.includes(shape.id))
@@ -299,21 +300,21 @@ export default function Canvas() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (interaction.mode !== "idle" || isMenuOpen) {
+      if (interaction.mode !== 'idle' || isMenuOpen) {
         return;
       }
 
       if (
         event.target instanceof HTMLElement &&
         (event.target.isContentEditable ||
-          ["BUTTON", "INPUT", "SELECT", "TEXTAREA"].includes(event.target.tagName))
+          ['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(event.target.tagName))
       ) {
         return;
       }
 
       const hasCommandModifier = event.metaKey || event.ctrlKey;
 
-      if (hasCommandModifier && event.key.toLowerCase() === "a") {
+      if (hasCommandModifier && event.key.toLowerCase() === 'a') {
         event.preventDefault();
         setSelectedShapeIds(document.shapes.map((shape) => shape.id));
         return;
@@ -321,12 +322,12 @@ export default function Canvas() {
 
       if (hasCommandModifier) {
         switch (event.key.toLowerCase()) {
-          case "d": {
+          case 'd': {
             event.preventDefault();
             runDuplicateSelection();
             return;
           }
-          case "g": {
+          case 'g': {
             event.preventDefault();
             if (event.shiftKey) {
               runUngroupSelection();
@@ -336,22 +337,22 @@ export default function Canvas() {
             runGroupSelection();
             return;
           }
-          case "o": {
+          case 'o': {
             event.preventDefault();
             runImportDocument();
             return;
           }
-          case "s": {
+          case 's': {
             event.preventDefault();
             runExportDocument();
             return;
           }
-          case "y": {
+          case 'y': {
             event.preventDefault();
             runRedo();
             return;
           }
-          case "z": {
+          case 'z': {
             event.preventDefault();
             if (event.shiftKey) {
               runRedo();
@@ -364,12 +365,12 @@ export default function Canvas() {
         }
       }
 
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setSelectedShapeIds([]);
         return;
       }
 
-      if (event.key === "Delete" || event.key === "Backspace") {
+      if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
         runDeleteSelection();
         return;
@@ -378,22 +379,22 @@ export default function Canvas() {
       const nudgeDistance = event.shiftKey ? 10 : 1;
 
       switch (event.key) {
-        case "ArrowUp": {
+        case 'ArrowUp': {
           event.preventDefault();
           runNudgeSelection(0, -nudgeDistance);
           return;
         }
-        case "ArrowDown": {
+        case 'ArrowDown': {
           event.preventDefault();
           runNudgeSelection(0, nudgeDistance);
           return;
         }
-        case "ArrowLeft": {
+        case 'ArrowLeft': {
           event.preventDefault();
           runNudgeSelection(-nudgeDistance, 0);
           return;
         }
-        case "ArrowRight": {
+        case 'ArrowRight': {
           event.preventDefault();
           runNudgeSelection(nudgeDistance, 0);
           return;
@@ -401,10 +402,10 @@ export default function Canvas() {
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [
     document.shapes,
@@ -458,18 +459,18 @@ export default function Canvas() {
 
       setSelectedShapeIds([]);
       dispatchHistory({
-        type: "document",
+        type: 'document',
         action: {
-          type: "loadDocument",
+          type: 'loadDocument',
           document: nextDocument,
         },
       });
     } catch (error) {
       window.alert(
-        error instanceof Error ? error.message : "Unable to import the selected document.",
+        error instanceof Error ? error.message : 'Unable to import the selected document.',
       );
     } finally {
-      event.currentTarget.value = "";
+      event.currentTarget.value = '';
     }
   };
 
@@ -498,7 +499,7 @@ export default function Canvas() {
       const startCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
 
       setInteraction({
-        mode: "marquee",
+        mode: 'marquee',
         pointerId: e.pointerId,
         startCanvasPoint,
         currentCanvasPoint: startCanvasPoint,
@@ -509,7 +510,7 @@ export default function Canvas() {
 
     setSelectedShapeIds([]);
     setInteraction({
-      mode: "panning",
+      mode: 'panning',
       pointerId: e.pointerId,
       startClientPoint: { x: e.clientX, y: e.clientY },
       startViewport: viewport,
@@ -517,7 +518,7 @@ export default function Canvas() {
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (interaction.mode === "idle") {
+    if (interaction.mode === 'idle') {
       return;
     }
 
@@ -525,7 +526,7 @@ export default function Canvas() {
       return;
     }
 
-    if (interaction.mode === "panning") {
+    if (interaction.mode === 'panning') {
       const dx = e.clientX - interaction.startClientPoint.x;
       const dy = e.clientY - interaction.startClientPoint.y;
 
@@ -538,7 +539,7 @@ export default function Canvas() {
       return;
     }
 
-    if (interaction.mode === "dragging-shapes") {
+    if (interaction.mode === 'dragging-shapes') {
       const currentCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
       const dx = currentCanvasPoint.x - interaction.startCanvasPoint.x;
       const dy = currentCanvasPoint.y - interaction.startCanvasPoint.y;
@@ -595,7 +596,7 @@ export default function Canvas() {
       return;
     }
 
-    if (interaction.mode === "resizing-shape") {
+    if (interaction.mode === 'resizing-shape') {
       const currentCanvasPoint = screenToCanvas(getLocalPoint(e.clientX, e.clientY), viewport);
       const deltaX = currentCanvasPoint.x - interaction.startCanvasPoint.x;
       const deltaY = currentCanvasPoint.y - interaction.startCanvasPoint.y;
@@ -633,23 +634,23 @@ export default function Canvas() {
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (interaction.mode === "idle" || interaction.pointerId !== e.pointerId) {
+    if (interaction.mode === 'idle' || interaction.pointerId !== e.pointerId) {
       return;
     }
 
-    if (interaction.mode === "dragging-shapes") {
+    if (interaction.mode === 'dragging-shapes') {
       dispatchHistory({
-        type: "document",
+        type: 'document',
         action: {
-          type: "moveShapes",
+          type: 'moveShapes',
           positions: interaction.previewPositions,
         },
       });
-    } else if (interaction.mode === "resizing-shape") {
+    } else if (interaction.mode === 'resizing-shape') {
       dispatchHistory({
-        type: "document",
+        type: 'document',
         action: {
-          type: "resizeShape",
+          type: 'resizeShape',
           shapeId: interaction.shapeId,
           rect: clampRectSize(interaction.previewRect, MIN_SHAPE_WIDTH, MIN_SHAPE_HEIGHT),
         },
@@ -657,16 +658,16 @@ export default function Canvas() {
     }
 
     releasePointer(e.pointerId);
-    setInteraction({ mode: "idle" });
+    setInteraction({ mode: 'idle' });
   };
 
   const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (interaction.mode === "idle" || interaction.pointerId !== e.pointerId) {
+    if (interaction.mode === 'idle' || interaction.pointerId !== e.pointerId) {
       return;
     }
 
     releasePointer(e.pointerId);
-    setInteraction({ mode: "idle" });
+    setInteraction({ mode: 'idle' });
   };
 
   const handleShapePointerDown = (e: React.PointerEvent<HTMLDivElement>, shapeId: string) => {
@@ -724,7 +725,7 @@ export default function Canvas() {
     capturePointer(e.pointerId);
     setSelectedShapeIds(nextSelectedIds);
     setInteraction({
-      mode: "dragging-shapes",
+      mode: 'dragging-shapes',
       pointerId: e.pointerId,
       leadShapeId: shapeId,
       shapeIds: nextSelectedIds,
@@ -754,7 +755,7 @@ export default function Canvas() {
 
     capturePointer(e.pointerId);
     setInteraction({
-      mode: "resizing-shape",
+      mode: 'resizing-shape',
       pointerId: e.pointerId,
       shapeId,
       handle,
@@ -765,7 +766,7 @@ export default function Canvas() {
   };
 
   const runAlignAction = (mode: AlignMode) => {
-    if (interaction.mode !== "idle") {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
@@ -776,16 +777,16 @@ export default function Canvas() {
     }
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "moveShapes",
+        type: 'moveShapes',
         positions: alignShapes(selectedShapes, mode),
       },
     });
   };
 
-  const runDistributeAction = (axis: "horizontal" | "vertical") => {
-    if (interaction.mode !== "idle") {
+  const runDistributeAction = (axis: 'horizontal' | 'vertical') => {
+    if (interaction.mode !== 'idle') {
       return;
     }
 
@@ -796,16 +797,16 @@ export default function Canvas() {
     }
 
     dispatchHistory({
-      type: "document",
+      type: 'document',
       action: {
-        type: "moveShapes",
+        type: 'moveShapes',
         positions: distributeShapes(selectedShapes, axis),
       },
     });
   };
 
   const renderedShapes = document.shapes.map((shape) => {
-    if (interaction.mode === "dragging-shapes") {
+    if (interaction.mode === 'dragging-shapes') {
       const previewPosition = interaction.previewPositions[shape.id];
 
       if (previewPosition) {
@@ -821,7 +822,7 @@ export default function Canvas() {
       }
     }
 
-    if (interaction.mode === "resizing-shape" && interaction.shapeId === shape.id) {
+    if (interaction.mode === 'resizing-shape' && interaction.shapeId === shape.id) {
       return {
         id: shape.id,
         type: shape.type,
@@ -835,28 +836,28 @@ export default function Canvas() {
 
     return shape;
   });
-  const activeGuides = interaction.mode === "dragging-shapes" ? interaction.guides : [];
+  const activeGuides = interaction.mode === 'dragging-shapes' ? interaction.guides : [];
   const marqueeRect =
-    interaction.mode === "marquee"
+    interaction.mode === 'marquee'
       ? makeRectFromPoints(interaction.startCanvasPoint, interaction.currentCanvasPoint)
       : null;
   const selectedShapes = renderedShapes.filter((shape) => selectedShapeIds.includes(shape.id));
   const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : null;
   const overlappingShapeIds = getOverlappingShapeIds(renderedShapes);
   const selectedGroupIds = getSelectedGroupIds(selectedShapeIds, document.shapes);
-  const canEditSelection = selectedShapeIds.length > 0 && interaction.mode === "idle";
-  const canAlign = selectedShapeIds.length >= 2 && interaction.mode === "idle";
-  const canDistribute = selectedShapeIds.length >= 3 && interaction.mode === "idle";
-  const canGroup = selectedShapeIds.length >= 2 && interaction.mode === "idle";
-  const canUngroup = selectedGroupIds.length > 0 && interaction.mode === "idle";
-  const canUndo = history.past.length > 0 && interaction.mode === "idle";
-  const canRedo = history.future.length > 0 && interaction.mode === "idle";
+  const canEditSelection = selectedShapeIds.length > 0 && interaction.mode === 'idle';
+  const canAlign = selectedShapeIds.length >= 2 && interaction.mode === 'idle';
+  const canDistribute = selectedShapeIds.length >= 3 && interaction.mode === 'idle';
+  const canGroup = selectedShapeIds.length >= 2 && interaction.mode === 'idle';
+  const canUngroup = selectedGroupIds.length > 0 && interaction.mode === 'idle';
+  const canUndo = history.past.length > 0 && interaction.mode === 'idle';
+  const canRedo = history.future.length > 0 && interaction.mode === 'idle';
   const autosaveLabel = autosaveSnapshot
     ? `Autosaved ${new Date(autosaveSnapshot.savedAt).toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
+        hour: 'numeric',
+        minute: '2-digit',
       })}`
-    : "No autosave available";
+    : 'No autosave available';
 
   return (
     <div
@@ -865,7 +866,7 @@ export default function Canvas() {
       style={{
         backgroundPosition: `${viewport.panX}px ${viewport.panY}px`,
         backgroundSize: `${40 * viewport.zoom}px ${40 * viewport.zoom}px`,
-        cursor: isPanning || isDraggingShape || isResizingShape ? "grabbing" : "grab",
+        cursor: isPanning || isDraggingShape || isResizingShape ? 'grabbing' : 'grab',
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -906,19 +907,19 @@ export default function Canvas() {
       >
         {renderedShapes.map((shape: Shape) => (
           <div
-            key={"shape" + shape.id}
-            className={`shape${selectedShapeIds.includes(shape.id) ? " is-selected" : ""}${
-              interaction.mode === "dragging-shapes" && interaction.shapeIds.includes(shape.id)
-                ? " is-dragging"
-                : ""
-            }${overlappingShapeIds.includes(shape.id) ? " is-overlapping" : ""}${
-              interaction.mode === "resizing-shape" && interaction.shapeId === shape.id
-                ? " is-resizing"
-                : ""
+            key={'shape' + shape.id}
+            className={`shape${selectedShapeIds.includes(shape.id) ? ' is-selected' : ''}${
+              interaction.mode === 'dragging-shapes' && interaction.shapeIds.includes(shape.id)
+                ? ' is-dragging'
+                : ''
+            }${overlappingShapeIds.includes(shape.id) ? ' is-overlapping' : ''}${
+              interaction.mode === 'resizing-shape' && interaction.shapeId === shape.id
+                ? ' is-resizing'
+                : ''
             }`}
             style={{
-              left: shape.x + "px",
-              top: shape.y + "px",
+              left: shape.x + 'px',
+              top: shape.y + 'px',
               width: shape.width,
               height: shape.height,
               backgroundColor: shape.color,
@@ -953,7 +954,7 @@ export default function Canvas() {
       <svg className="overlay" aria-hidden="true">
         <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
           {activeGuides.map((guide) => {
-            if (guide.orientation === "vertical") {
+            if (guide.orientation === 'vertical') {
               return (
                 <line
                   key={`guide-v-${guide.x}-${guide.y1}-${guide.y2}`}

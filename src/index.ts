@@ -1,27 +1,28 @@
-import { serve } from "bun";
-import index from "./index.html";
+import { serve } from 'bun';
+
+import index from './index.html';
 
 const server = serve({
   routes: {
     // Serve index.html for all unmatched routes.
-    "/*": index,
+    '/*': index,
 
-    "/api/hello": {
+    '/api/hello': {
       async GET(_req) {
         return Response.json({
-          message: "Hello, world!",
-          method: "GET",
+          message: 'Hello, world!',
+          method: 'GET',
         });
       },
       async PUT(_req) {
         return Response.json({
-          message: "Hello, world!",
-          method: "PUT",
+          message: 'Hello, world!',
+          method: 'PUT',
         });
       },
     },
 
-    "/api/hello/:name": async (req) => {
+    '/api/hello/:name': async (req) => {
       const name = req.params.name;
       return Response.json({
         message: `Hello, ${name}!`,
@@ -29,7 +30,7 @@ const server = serve({
     },
   },
 
-  development: process.env.NODE_ENV !== "production" && {
+  development: process.env.NODE_ENV !== 'production' && {
     // Enable browser hot reloading in development
     hmr: true,
 

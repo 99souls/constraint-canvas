@@ -1,10 +1,11 @@
-import type { CanvasDocument } from "../types/Document";
-import type { Shape } from "../types/Shape";
+import type { CanvasDocument } from '../types/Document';
+import type { Shape } from '../types/Shape';
 
-const AUTOSAVE_STORAGE_KEY = "constraint-canvas.autosave.v1";
+const AUTOSAVE_STORAGE_KEY = 'constraint-canvas.autosave.v1';
 const DOCUMENT_VERSION = 1;
 
 type SerializedDocument = {
+  savedAt: number;
   version: number;
   document: CanvasDocument;
 };
@@ -35,11 +36,11 @@ export function parseDocument(serializedDocument: string): CanvasDocument {
   try {
     parsedDocument = JSON.parse(serializedDocument);
   } catch {
-    throw new Error("The selected file is not valid JSON.");
+    throw new Error('The selected file is not valid JSON.');
   }
 
   if (!isSerializedDocument(parsedDocument)) {
-    throw new Error("The selected file does not match the expected document format.");
+    throw new Error('The selected file does not match the expected document format.');
   }
 
   return cloneDocument(parsedDocument.document);
@@ -47,10 +48,10 @@ export function parseDocument(serializedDocument: string): CanvasDocument {
 
 export function downloadDocument(canvasDocument: CanvasDocument): void {
   const serializedDocument = serializeDocument(canvasDocument);
-  const blob = new Blob([serializedDocument], { type: "application/json" });
+  const blob = new Blob([serializedDocument], { type: 'application/json' });
   const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  const timestamp = new Date().toISOString().replaceAll(":", "-");
+  const anchor = document.createElement('a');
+  const timestamp = new Date().toISOString().replaceAll(':', '-');
 
   anchor.href = objectUrl;
   anchor.download = `constraint-canvas-${timestamp}.json`;
@@ -59,7 +60,7 @@ export function downloadDocument(canvasDocument: CanvasDocument): void {
 }
 
 export function saveAutosave(canvasDocument: CanvasDocument): AutosaveSnapshot | null {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return null;
   }
 
@@ -78,7 +79,7 @@ export function saveAutosave(canvasDocument: CanvasDocument): AutosaveSnapshot |
 }
 
 export function loadAutosave(): AutosaveSnapshot | null {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return null;
   }
 
@@ -107,7 +108,7 @@ export function loadAutosave(): AutosaveSnapshot | null {
 }
 
 export function clearAutosave(): void {
-  if (typeof window === "undefined") {
+  if (typeof window === 'undefined') {
     return;
   }
 
@@ -123,7 +124,7 @@ function isSerializedDocument(value: unknown): value is SerializedDocument {
 }
 
 function isSerializedAutosave(value: unknown): value is SerializedAutosave {
-  return isSerializedDocument(value) && typeof value.savedAt === "number";
+  return isSerializedDocument(value) && typeof value?.savedAt === 'number';
 }
 
 function isCanvasDocument(value: unknown): value is CanvasDocument {
@@ -133,19 +134,19 @@ function isCanvasDocument(value: unknown): value is CanvasDocument {
 function isShape(value: unknown): value is Shape {
   return (
     isRecord(value) &&
-    typeof value.id === "string" &&
-    value.type === "rectangle" &&
-    typeof value.x === "number" &&
-    typeof value.y === "number" &&
-    typeof value.width === "number" &&
-    typeof value.height === "number" &&
-    typeof value.color === "string" &&
-    (value.groupId === undefined || typeof value.groupId === "string")
+    typeof value.id === 'string' &&
+    value.type === 'rectangle' &&
+    typeof value.x === 'number' &&
+    typeof value.y === 'number' &&
+    typeof value.width === 'number' &&
+    typeof value.height === 'number' &&
+    typeof value.color === 'string' &&
+    (value.groupId === undefined || typeof value.groupId === 'string')
   );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 function cloneDocument(document: CanvasDocument): CanvasDocument {

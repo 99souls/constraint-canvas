@@ -1,18 +1,14 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": [
-    ".reference",
-    ".plans",
-    "dist",
-    "dist-electron",
-    "node_modules",
-    "bun.lock",
-    "*.tsbuildinfo",
-    "**/routeTree.gen.ts",
-    "apps/web/public/mockServiceWorker.js",
-    "apps/web/src/lib/vendor/qrcodegen.ts",
-    "*.icon/**"
-  ],
+  "ignorePatterns": [".reference", ".plans", "dist", "node_modules", "bun.lock", ".docs"],
   "sortPackageJson": {},
-  "overrides": []
+  "overrides": [],
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": true,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "sortImports": true
 }

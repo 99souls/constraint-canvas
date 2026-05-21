@@ -1,4 +1,4 @@
-import type { Shape } from "../types/Shape";
+import type { Shape } from '../types/Shape';
 
 export function getSelectionForShape(shapeId: string, shapes: Shape[]): string[] {
   const shape = shapes.find((currentShape) => currentShape.id === shapeId);
@@ -42,7 +42,7 @@ export function getSelectedGroupIds(shapeIds: string[], shapes: Shape[]): string
 
 export function duplicateShapes(
   shapes: Shape[],
-  createId: (prefix: "shape" | "group") => string,
+  createId: (prefix: 'shape' | 'group') => string,
   offset = 24,
 ): Shape[] {
   const nextGroupIds = new Map<string, string>();
@@ -54,14 +54,14 @@ export function duplicateShapes(
       groupId = nextGroupIds.get(shape.groupId);
 
       if (!groupId) {
-        groupId = createId("group");
+        groupId = createId('group');
         nextGroupIds.set(shape.groupId, groupId);
       }
     }
 
     return {
       ...shape,
-      id: createId("shape"),
+      id: createId('shape'),
       x: shape.x + offset,
       y: shape.y + offset,
       groupId,

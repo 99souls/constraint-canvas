@@ -1,4 +1,4 @@
-import type { Viewport } from "../types/Viewport";
+import type { Viewport } from '../types/Viewport';
 
 export type Point = {
   x: number;
@@ -12,7 +12,7 @@ export type Rect = {
   height: number;
 };
 
-export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
 export function clampZoom(zoom: number): number {
   return Math.min(2.5, Math.max(0.4, zoom));
@@ -80,19 +80,19 @@ export function resizeRect(
   let nextRight = rect.x + rect.width;
   let nextBottom = rect.y + rect.height;
 
-  if (handle.includes("w")) {
+  if (handle.includes('w')) {
     nextLeft = Math.min(nextLeft + deltaX, nextRight - minimumWidth);
   }
 
-  if (handle.includes("e")) {
+  if (handle.includes('e')) {
     nextRight = Math.max(nextRight + deltaX, nextLeft + minimumWidth);
   }
 
-  if (handle.includes("n")) {
+  if (handle.includes('n')) {
     nextTop = Math.min(nextTop + deltaY, nextBottom - minimumHeight);
   }
 
-  if (handle.includes("s")) {
+  if (handle.includes('s')) {
     nextBottom = Math.max(nextBottom + deltaY, nextTop + minimumHeight);
   }
 

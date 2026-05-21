@@ -9,8 +9,9 @@ import {
   AlignVerticalSpacing,
   RedoAction,
   UndoAction,
-} from "iconoir-react";
-import type { AlignMode } from "../lib/layout";
+} from 'iconoir-react';
+
+import type { AlignMode } from '../lib/layout';
 
 type CanvasToolbarProps = {
   canUndo: boolean;
@@ -20,7 +21,7 @@ type CanvasToolbarProps = {
   onUndo: () => void;
   onRedo: () => void;
   onAlign: (mode: AlignMode) => void;
-  onDistribute: (axis: "horizontal" | "vertical") => void;
+  onDistribute: (axis: 'horizontal' | 'vertical') => void;
 };
 
 export function CanvasToolbar(props: CanvasToolbarProps) {
@@ -57,7 +58,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("left")}
+          onClick={() => props.onAlign('left')}
           disabled={!props.canAlign}
           title="Align Left"
         >
@@ -66,7 +67,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("right")}
+          onClick={() => props.onAlign('right')}
           disabled={!props.canAlign}
           title="Align Right"
         >
@@ -75,7 +76,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("top")}
+          onClick={() => props.onAlign('top')}
           disabled={!props.canAlign}
           title="Align Top"
         >
@@ -84,7 +85,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("bottom")}
+          onClick={() => props.onAlign('bottom')}
           disabled={!props.canAlign}
           title="Align Bottom"
         >
@@ -93,7 +94,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("horizontal-center")}
+          onClick={() => props.onAlign('horizontal-center')}
           disabled={!props.canAlign}
           title="Center Horizontally"
         >
@@ -102,7 +103,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onAlign("vertical-center")}
+          onClick={() => props.onAlign('vertical-center')}
           disabled={!props.canAlign}
           title="Center Vertically"
         >
@@ -116,7 +117,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onDistribute("horizontal")}
+          onClick={() => props.onDistribute('horizontal')}
           disabled={!props.canDistribute}
           title="Distribute Horizontally"
         >
@@ -125,7 +126,7 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
         <button
           type="button"
           className="toolbar-button"
-          onClick={() => props.onDistribute("vertical")}
+          onClick={() => props.onDistribute('vertical')}
           disabled={!props.canDistribute}
           title="Distribute Vertically"
         >

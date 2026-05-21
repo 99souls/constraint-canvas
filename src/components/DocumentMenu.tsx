@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   Copy,
   Download,
@@ -10,7 +9,8 @@ import {
   Trash,
   Unjoin3d,
   Upload,
-} from "iconoir-react";
+} from 'iconoir-react';
+import { useEffect, useRef, useState, type ComponentType } from 'react';
 
 type MenuAction = {
   label: string;
@@ -70,32 +70,32 @@ export function DocumentMenu(props: DocumentMenuProps) {
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         setIsOpen(false);
       }
     };
 
-    window.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      window.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
   const documentActions: MenuAction[] = [
-    { label: "New Document", icon: PagePlus, onSelect: onNewDocument },
-    { label: "Export JSON", icon: Download, onSelect: onExportDocument },
-    { label: "Import JSON", icon: Upload, onSelect: onImportDocument },
+    { label: 'New Document', icon: PagePlus, onSelect: onNewDocument },
+    { label: 'Export JSON', icon: Download, onSelect: onExportDocument },
+    { label: 'Import JSON', icon: Upload, onSelect: onImportDocument },
     {
-      label: "Restore Autosave",
+      label: 'Restore Autosave',
       icon: RefreshCircle,
       onSelect: onRestoreAutosave,
       disabled: !canRestoreAutosave,
     },
     {
-      label: "Clear Autosave",
+      label: 'Clear Autosave',
       icon: Trash,
       onSelect: onClearAutosave,
       disabled: !canRestoreAutosave,
@@ -103,25 +103,25 @@ export function DocumentMenu(props: DocumentMenuProps) {
   ];
   const selectionActions: MenuAction[] = [
     {
-      label: "Duplicate Selection",
+      label: 'Duplicate Selection',
       icon: Copy,
       onSelect: onDuplicateSelection,
       disabled: !canEditSelection,
     },
     {
-      label: "Delete Selection",
+      label: 'Delete Selection',
       icon: Trash,
       onSelect: onDeleteSelection,
       disabled: !canEditSelection,
     },
     {
-      label: "Group Selection",
+      label: 'Group Selection',
       icon: Group,
       onSelect: onGroupSelection,
       disabled: !canGroup,
     },
     {
-      label: "Ungroup Selection",
+      label: 'Ungroup Selection',
       icon: Unjoin3d,
       onSelect: onUngroupSelection,
       disabled: !canUngroup,

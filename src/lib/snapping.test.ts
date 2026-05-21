@@ -1,8 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { resolveMoveSnapping } from "./snapping";
+import { describe, expect, it } from 'vitest';
 
-describe("resolveMoveSnapping", () => {
-  it("snaps a moving edge to a nearby target edge", () => {
+import { resolveMoveSnapping } from './snapping';
+
+describe('resolveMoveSnapping', () => {
+  it('snaps a moving edge to a nearby target edge', () => {
     const result = resolveMoveSnapping({
       movingRect: {
         x: 98,
@@ -24,7 +25,7 @@ describe("resolveMoveSnapping", () => {
     expect(result.position).toEqual({ x: 100, y: 60 });
     expect(result.guides).toEqual([
       {
-        orientation: "vertical",
+        orientation: 'vertical',
         x: 100,
         y1: 60,
         y2: 320,
@@ -32,7 +33,7 @@ describe("resolveMoveSnapping", () => {
     ]);
   });
 
-  it("returns no guides when nothing is within threshold", () => {
+  it('returns no guides when nothing is within threshold', () => {
     const result = resolveMoveSnapping({
       movingRect: {
         x: 20,

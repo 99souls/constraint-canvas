@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveMoveSnapping } from './snapping';
+import { resolveMoveSnapping, resolveResizeSnapping, snapValueToGrid } from './snapping';
 
 describe('resolveMoveSnapping', () => {
   it('snaps a moving edge to a nearby target edge', () => {
@@ -54,5 +54,46 @@ describe('resolveMoveSnapping', () => {
 
     expect(result.position).toEqual({ x: 20, y: 20 });
     expect(result.guides).toEqual([]);
+  });
+
+  it('snaps a resizing east edge to a nearby target edge', () => {
+    const result = resolveResizeSnapping({
+      rect: {
+        x: 20,
+        y: 20,
+        width: 99,
+        height: 50,
+      },
+      stationaryRects: [
+        {
+          x: 120,
+          y: 0,
+          width: 40,
+          height: 120,
+        },
+      ],
+      handle: 'e',
+      threshold: 4,
+    });
+
+    expect(result.rect).toEqual({
+      x: 20,
+      y: 20,
+      width: 100,
+      height: 50,
+    });
+    expect(result.guides).toEqual([
+      {
+        orientation: 'vertical',
+        x: 120,
+        y1: 0,
+        y2: 120,
+      },
+    ]);
+  });
+
+  it('snaps values to the nearest grid line', () => {
+    expect(snapValueToGrid(83, 40)).toBe(80);
+    expect(snapValueToGrid(101, 40)).toBe(120);
   });
 });

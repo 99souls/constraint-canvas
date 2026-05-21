@@ -5,12 +5,18 @@ import {
   AlignLeftBox,
   AlignRightBox,
   AlignTopBox,
+  FastArrowDown,
+  FastArrowUp,
+  NavArrowDown,
+  NavArrowUp,
   AlignVerticalCenters,
   AlignVerticalSpacing,
   RedoAction,
   UndoAction,
+  ViewGrid,
 } from 'iconoir-react';
 
+import type { LayerOrderAction } from '../lib/layering';
 import type { AlignMode } from '../lib/layout';
 
 type CanvasToolbarProps = {
@@ -18,10 +24,14 @@ type CanvasToolbarProps = {
   canRedo: boolean;
   canAlign: boolean;
   canDistribute: boolean;
+  canLayer: boolean;
+  gridSnapEnabled: boolean;
   onUndo: () => void;
   onRedo: () => void;
   onAlign: (mode: AlignMode) => void;
   onDistribute: (axis: 'horizontal' | 'vertical') => void;
+  onLayerOrder: (order: LayerOrderAction) => void;
+  onToggleGridSnap: () => void;
 };
 
 export function CanvasToolbar(props: CanvasToolbarProps) {
@@ -113,6 +123,47 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
 
       <div className="toolbar-divider" />
 
+      <div className="toolbar-group" role="group" aria-label="Layer order">
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => props.onLayerOrder('send-to-back')}
+          disabled={!props.canLayer}
+          title="Send to Back"
+        >
+          <FastArrowDown />
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => props.onLayerOrder('send-backward')}
+          disabled={!props.canLayer}
+          title="Send Backward"
+        >
+          <NavArrowDown />
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => props.onLayerOrder('bring-forward')}
+          disabled={!props.canLayer}
+          title="Bring Forward"
+        >
+          <NavArrowUp />
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          onClick={() => props.onLayerOrder('bring-to-front')}
+          disabled={!props.canLayer}
+          title="Bring to Front"
+        >
+          <FastArrowUp />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
       <div className="toolbar-group" role="group" aria-label="Distribution">
         <button
           type="button"
@@ -131,6 +182,20 @@ export function CanvasToolbar(props: CanvasToolbarProps) {
           title="Distribute Vertically"
         >
           <AlignVerticalSpacing />
+        </button>
+      </div>
+
+      <div className="toolbar-divider" />
+
+      <div className="toolbar-group" role="group" aria-label="Snap settings">
+        <button
+          type="button"
+          className={`toolbar-button${props.gridSnapEnabled ? ' is-active' : ''}`}
+          onClick={props.onToggleGridSnap}
+          title={props.gridSnapEnabled ? 'Disable Grid Snap' : 'Enable Grid Snap'}
+          aria-pressed={props.gridSnapEnabled}
+        >
+          <ViewGrid />
         </button>
       </div>
     </div>

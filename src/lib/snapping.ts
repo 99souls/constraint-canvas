@@ -1,4 +1,4 @@
-import { getRectCenter, type Point, type Rect } from './geometry';
+import { getRectCenter, type Point, type Rect, type ResizeHandle } from './geometry';
 
 export type Guide =
   | {
@@ -30,6 +30,18 @@ type ResolveMoveSnappingResult = {
   guides: Guide[];
 };
 
+type ResolveResizeSnappingInput = {
+  rect: Rect;
+  stationaryRects: Rect[];
+  handle: ResizeHandle;
+  threshold: number;
+};
+
+type ResolveResizeSnappingResult = {
+  rect: Rect;
+  guides: Guide[];
+};
+
 export function resolveMoveSnapping(input: ResolveMoveSnappingInput): ResolveMoveSnappingResult {
   const vertical = pickClosestCandidate(
     collectVerticalCandidates(input.movingRect, input.stationaryRects, input.threshold),
@@ -45,6 +57,75 @@ export function resolveMoveSnapping(input: ResolveMoveSnappingInput): ResolveMov
     },
     guides: [vertical?.guide, horizontal?.guide].filter((guide): guide is Guide => Boolean(guide)),
   };
+}
+
+export function resolveResizeSnapping(
+  input: ResolveResizeSnappingInput,
+): ResolveResizeSnappingResult {
+  const horizontal = input.handle.includes('e')
+    ? pickClosestCandidate(
+        collectVerticalCandidates(
+          { ...input.rect, x: input.rect.x + input.rect.width, width: 0 },
+          input.stationaryRects,
+          input.threshold,
+        ),
+      )
+    : input.handle.includes('w')
+      ? pickClosestCandidate(
+          collectVerticalCandidates(
+            { ...input.rect, width: 0 },
+            input.stationaryRects,
+            input.threshold,
+          ),
+        )
+      : undefined;
+
+  const vertical = input.handle.includes('s')
+    ? pickClosestCandidate(
+        collectHorizontalCandidates(
+          { ...input.rect, y: input.rect.y + input.rect.height, height: 0 },
+          input.stationaryRects,
+          input.threshold,
+        ),
+      )
+    : input.handle.includes('n')
+      ? pickClosestCandidate(
+          collectHorizontalCandidates(
+            { ...input.rect, height: 0 },
+            input.stationaryRects,
+            input.threshold,
+          ),
+        )
+      : undefined;
+
+  let nextRect = { ...input.rect };
+
+  if (horizontal) {
+    if (input.handle.includes('e')) {
+      nextRect.width += horizontal.delta;
+    } else {
+      nextRect.x += horizontal.delta;
+      nextRect.width -= horizontal.delta;
+    }
+  }
+
+  if (vertical) {
+    if (input.handle.includes('s')) {
+      nextRect.height += vertical.delta;
+    } else {
+      nextRect.y += vertical.delta;
+      nextRect.height -= vertical.delta;
+    }
+  }
+
+  return {
+    rect: nextRect,
+    guides: [horizontal?.guide, vertical?.guide].filter((guide): guide is Guide => Boolean(guide)),
+  };
+}
+
+export function snapValueToGrid(value: number, gridSize: number): number {
+  return Math.round(value / gridSize) * gridSize;
 }
 
 function collectVerticalCandidates(

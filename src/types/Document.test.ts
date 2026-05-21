@@ -99,6 +99,18 @@ describe('documentReducer', () => {
       'groupId',
     );
   });
+
+  it('reorders shapes through the reducer', () => {
+    const document = createInitialDocument();
+
+    const nextDocument = documentReducer(document, {
+      type: 'reorderShapes',
+      shapeIds: ['1'],
+      order: 'bring-to-front',
+    });
+
+    expect(nextDocument.shapes.map((shape) => shape.id)).toEqual(['2', '3', '1']);
+  });
 });
 
 describe('historyReducer', () => {

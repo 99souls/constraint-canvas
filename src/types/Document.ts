@@ -1,3 +1,4 @@
+import { reorderShapes, type LayerOrderAction } from '../lib/layering';
 import type { Shape } from './Shape';
 
 export type CanvasDocument = {
@@ -17,6 +18,12 @@ export type AddShapesAction = {
 export type DeleteShapesAction = {
   type: 'deleteShapes';
   shapeIds: string[];
+};
+
+export type ReorderShapesAction = {
+  type: 'reorderShapes';
+  shapeIds: string[];
+  order: LayerOrderAction;
 };
 
 export type ResizeShapeAction = {
@@ -39,6 +46,7 @@ export type DocumentAction =
   | MoveShapesAction
   | AddShapesAction
   | DeleteShapesAction
+  | ReorderShapesAction
   | ResizeShapeAction
   | SetShapeGroupsAction
   | LoadDocumentAction;
@@ -130,6 +138,18 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
       const nextShapes = document.shapes.filter((shape) => !action.shapeIds.includes(shape.id));
 
       if (nextShapes.length === document.shapes.length) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: nextShapes,
+      };
+    }
+    case 'reorderShapes': {
+      const nextShapes = reorderShapes(document.shapes, action.shapeIds, action.order);
+
+      if (nextShapes.every((shape, index) => shape === document.shapes[index])) {
         return document;
       }
 

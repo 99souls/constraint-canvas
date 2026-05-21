@@ -88,6 +88,172 @@ body {
   pointer-events: none;
 }
 
+.inspector-card {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: min(320px, calc(100vw - 32px));
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(15, 15, 20, 0.88);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.inspector-card-header h2,
+.inspector-detail,
+.inspector-kicker,
+.inspector-section-title,
+.inspector-field span,
+.inspector-layer-button,
+.inspector-color-input input,
+.inspector-field input {
+  margin: 0;
+}
+
+.inspector-kicker {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inspector-card-header h2 {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.inspector-detail {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.9rem;
+}
+
+.inspector-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.inspector-section:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.inspector-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inspector-field {
+  display: grid;
+  gap: 6px;
+}
+
+.inspector-field span {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.inspector-field input,
+.inspector-color-input input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.96);
+  font: inherit;
+}
+
+.inspector-field input::placeholder,
+.inspector-color-input input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.inspector-field input:focus-visible,
+.inspector-color-input input:focus-visible,
+.inspector-layer-button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.inspector-field input:disabled,
+.inspector-color-input input:disabled,
+.inspector-layer-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.inspector-field-color {
+  gap: 8px;
+}
+
+.inspector-color-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inspector-color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  flex: none;
+}
+
+.inspector-layer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.inspector-layer-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  cursor: pointer;
+}
+
+.inspector-layer-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inspector-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
 .resize-handle {
   position: absolute;
   width: 12px;
@@ -347,6 +513,13 @@ body {
 }
 
 @media (max-width: 720px) {
+  .inspector-card {
+    top: auto;
+    right: 12px;
+    bottom: 12px;
+    width: min(320px, calc(100vw - 24px));
+  }
+
   .toolbar {
     left: 12px;
     right: 12px;

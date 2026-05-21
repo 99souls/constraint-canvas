@@ -1,6 +1,7 @@
 import type { Shape } from './../types/Shape';
 import { CanvasToolbar } from './CanvasToolbar';
 import { DocumentMenu } from './DocumentMenu';
+import { SelectionInspectorCard } from './SelectionInspectorCard';
 import { useCanvasEditor } from './useCanvasEditor';
 
 export default function Canvas() {
@@ -115,6 +116,8 @@ export default function Canvas() {
           ) : null}
         </g>
       </svg>
+
+      <SelectionInspectorCard {...editor.inspectorProps} />
 
       <CanvasToolbar {...editor.toolbarProps} />
     </div>

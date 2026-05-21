@@ -23,6 +23,7 @@ import {
   type ResizeHandle,
 } from '../lib/geometry';
 import { createEditorId } from '../lib/ids';
+import { getInspectorSelectionSummary } from '../lib/inspector';
 import { type LayerOrderAction } from '../lib/layering';
 import {
   alignShapes,
@@ -360,6 +361,24 @@ export function useCanvasEditor() {
       });
     },
     [document.shapes, interaction.mode, selectedShapeIds],
+  );
+
+  const runPatchSelection = useCallback(
+    (patch: Partial<Pick<Shape, 'x' | 'y' | 'width' | 'height' | 'color'>>) => {
+      if (interaction.mode !== 'idle' || selectedShapeIds.length === 0) {
+        return;
+      }
+
+      dispatchHistory({
+        type: 'document',
+        action: {
+          type: 'patchShapes',
+          shapeIds: selectedShapeIds,
+          patch,
+        },
+      });
+    },
+    [interaction.mode, selectedShapeIds],
   );
 
   const runLayerOrderAction = useCallback(
@@ -954,6 +973,7 @@ export function useCanvasEditor() {
       : null;
   const selectedShapes = renderedShapes.filter((shape) => selectedShapeIds.includes(shape.id));
   const singleSelectedShape = selectedShapes.length === 1 ? selectedShapes[0] : null;
+  const inspectorSummary = getInspectorSelectionSummary(selectedShapes);
   const selectionFrame = singleSelectedShape
     ? {
         shapeId: singleSelectedShape.id,
@@ -1030,6 +1050,15 @@ export function useCanvasEditor() {
       onDistribute: runDistributeAction,
       onLayerOrder: runLayerOrderAction,
       onToggleGridSnap: toggleGridSnap,
+    },
+    inspectorProps: {
+      summary: inspectorSummary,
+      disabled: interaction.mode !== 'idle',
+      minWidth: MIN_SHAPE_WIDTH,
+      minHeight: MIN_SHAPE_HEIGHT,
+      canLayer: canEditSelection,
+      onPatchSelection: runPatchSelection,
+      onLayerOrder: runLayerOrderAction,
     },
     handleImportFileChange,
     handleWheel,

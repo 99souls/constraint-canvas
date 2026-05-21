@@ -26,6 +26,12 @@ export type ReorderShapesAction = {
   order: LayerOrderAction;
 };
 
+export type PatchShapesAction = {
+  type: 'patchShapes';
+  shapeIds: string[];
+  patch: Partial<Pick<Shape, 'x' | 'y' | 'width' | 'height' | 'color'>>;
+};
+
 export type ResizeShapeAction = {
   type: 'resizeShape';
   shapeId: string;
@@ -47,6 +53,7 @@ export type DocumentAction =
   | AddShapesAction
   | DeleteShapesAction
   | ReorderShapesAction
+  | PatchShapesAction
   | ResizeShapeAction
   | SetShapeGroupsAction
   | LoadDocumentAction;
@@ -150,6 +157,47 @@ export function documentReducer(document: CanvasDocument, action: DocumentAction
       const nextShapes = reorderShapes(document.shapes, action.shapeIds, action.order);
 
       if (nextShapes.every((shape, index) => shape === document.shapes[index])) {
+        return document;
+      }
+
+      return {
+        ...document,
+        shapes: nextShapes,
+      };
+    }
+    case 'patchShapes': {
+      if (action.shapeIds.length === 0 || Object.keys(action.patch).length === 0) {
+        return document;
+      }
+
+      const selectedShapeIds = new Set(action.shapeIds);
+      let didChange = false;
+
+      const nextShapes = document.shapes.map((shape) => {
+        if (!selectedShapeIds.has(shape.id)) {
+          return shape;
+        }
+
+        const nextShape = {
+          ...shape,
+          ...action.patch,
+        };
+
+        if (
+          nextShape.x === shape.x &&
+          nextShape.y === shape.y &&
+          nextShape.width === shape.width &&
+          nextShape.height === shape.height &&
+          nextShape.color === shape.color
+        ) {
+          return shape;
+        }
+
+        didChange = true;
+        return nextShape;
+      });
+
+      if (!didChange) {
         return document;
       }
 

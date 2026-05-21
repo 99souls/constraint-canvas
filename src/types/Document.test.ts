@@ -111,6 +111,28 @@ describe('documentReducer', () => {
 
     expect(nextDocument.shapes.map((shape) => shape.id)).toEqual(['2', '3', '1']);
   });
+
+  it('patches multiple selected shapes', () => {
+    const document = createInitialDocument();
+
+    const nextDocument = documentReducer(document, {
+      type: 'patchShapes',
+      shapeIds: ['1', '2'],
+      patch: {
+        x: 42,
+        color: '#123456',
+      },
+    });
+
+    expect(nextDocument.shapes.find((shape) => shape.id === '1')).toMatchObject({
+      x: 42,
+      color: '#123456',
+    });
+    expect(nextDocument.shapes.find((shape) => shape.id === '2')).toMatchObject({
+      x: 42,
+      color: '#123456',
+    });
+  });
 });
 
 describe('historyReducer', () => {

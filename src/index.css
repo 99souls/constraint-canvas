@@ -207,6 +207,7 @@ body {
 
 .inspector-field-color {
   gap: 8px;
+  position: relative;
 }
 
 .inspector-color-input {
@@ -215,12 +216,117 @@ body {
   gap: 10px;
 }
 
+.inspector-color-swatch-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.inspector-color-swatch-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inspector-color-swatch-button:focus-visible,
+.inspector-color-action:focus-visible,
+.inspector-range-field input:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.inspector-color-swatch-button:disabled,
+.inspector-color-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .inspector-color-swatch {
   width: 24px;
   height: 24px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 999px;
   flex: none;
+}
+
+.inspector-color-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 1;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(10, 10, 15, 0.96);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+}
+
+.inspector-color-preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.84rem;
+}
+
+.inspector-color-preview {
+  width: 44px;
+  height: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  flex: none;
+}
+
+.inspector-range-field {
+  display: grid;
+  gap: 6px;
+}
+
+.inspector-range-field span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+}
+
+.inspector-range-field input {
+  width: 100%;
+  margin: 0;
+}
+
+.inspector-color-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.inspector-color-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font: inherit;
+  cursor: pointer;
+}
+
+.inspector-color-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.inspector-color-action.is-primary {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .inspector-layer-actions {

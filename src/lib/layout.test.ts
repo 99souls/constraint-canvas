@@ -52,7 +52,7 @@ describe('layout helpers', () => {
 
   it('finds overlapping shape ids', () => {
     const overlapping = getOverlappingShapeIds([
-      shapes[0],
+      shapes[0]!,
       {
         id: 'd',
         type: 'rectangle',
@@ -62,7 +62,7 @@ describe('layout helpers', () => {
         height: 40,
         color: 'yellow',
       },
-      shapes[2],
+      shapes[2]!,
     ]);
 
     expect(overlapping.toSorted()).toEqual(['a', 'd']);

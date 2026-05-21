@@ -7,8 +7,15 @@ import {
   Position,
   Ruler,
 } from 'iconoir-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
+import {
+  hexToHsv,
+  hsvToHex,
+  normalizeHexColor,
+  resolveCssColorToHex,
+  type HsvColor,
+} from '../lib/color';
 import type { SharedValue, InspectorSelectionSummary } from '../lib/inspector';
 import type { LayerOrderAction } from '../lib/layering';
 
@@ -208,33 +215,102 @@ type InspectorColorFieldProps = {
 };
 
 function InspectorColorField(props: InspectorColorFieldProps) {
-  const valueText = getSharedValueText(props.value);
-  const [draftValue, setDraftValue] = useState(valueText);
+  const lastCommittedHexRef = useRef<string>('#777777');
+  const sourceColor = props.value.kind === 'single' ? props.value.value : props.previewColor;
+  const resolvedColor = useMemo(
+    () => resolveCssColorToHex(sourceColor) ?? '#777777',
+    [sourceColor],
+  );
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftValue, setDraftValue] = useState(resolvedColor);
+  const [draftHsv, setDraftHsv] = useState<HsvColor>(() => hexToHsv(resolvedColor));
 
   useEffect(() => {
-    setDraftValue(valueText);
-  }, [valueText]);
+    setDraftValue(resolvedColor);
+    setDraftHsv(hexToHsv(resolvedColor));
+    lastCommittedHexRef.current = resolvedColor;
+  }, [resolvedColor]);
+
+  useEffect(() => {
+    if (props.disabled) {
+      setIsOpen(false);
+    }
+  }, [props.disabled]);
 
   const resetDraft = () => {
-    setDraftValue(valueText);
+    setDraftValue(resolvedColor);
+    setDraftHsv(hexToHsv(resolvedColor));
   };
 
   const commitValue = () => {
-    const nextValue = draftValue.trim();
+    const nextValue = normalizeHexColor(draftValue);
 
-    if (nextValue === '') {
+    if (!nextValue) {
       resetDraft();
       return;
     }
 
+    if (nextValue === lastCommittedHexRef.current) {
+      return;
+    }
+
+    lastCommittedHexRef.current = nextValue;
     props.onCommit(nextValue);
   };
 
+  const closePopover = (shouldCommit: boolean) => {
+    if (shouldCommit) {
+      commitValue();
+    } else {
+      resetDraft();
+    }
+
+    setIsOpen(false);
+  };
+
+  const syncDraftFromHsv = (nextHsv: HsvColor) => {
+    setDraftHsv(nextHsv);
+    setDraftValue(hsvToHex(nextHsv));
+  };
+
   return (
-    <label className="inspector-field inspector-field-color">
+    <div
+      className="inspector-field inspector-field-color"
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          closePopover(true);
+        }
+      }}
+    >
       <span>{props.label}</span>
       <div className="inspector-color-input">
-        <span className="inspector-color-swatch" style={{ backgroundColor: props.previewColor }} />
+        <button
+          type="button"
+          className="inspector-color-swatch-button"
+          disabled={props.disabled}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          aria-label="Open fill color picker"
+          onClick={() => {
+            if (props.disabled) {
+              return;
+            }
+
+            if (isOpen) {
+              closePopover(true);
+              return;
+            }
+
+            setDraftValue(resolvedColor);
+            setDraftHsv(hexToHsv(resolvedColor));
+            setIsOpen(true);
+          }}
+        >
+          <span
+            className="inspector-color-swatch"
+            style={{ backgroundColor: props.previewColor }}
+          />
+        </button>
         <input
           type="text"
           value={draftValue}
@@ -244,17 +320,94 @@ function InspectorColorField(props: InspectorColorFieldProps) {
           onBlur={commitValue}
           onKeyDown={(event) => {
             if (event.key === 'Enter') {
-              event.currentTarget.blur();
+              closePopover(true);
             }
 
             if (event.key === 'Escape') {
-              resetDraft();
-              event.currentTarget.blur();
+              event.preventDefault();
+              closePopover(false);
             }
           }}
         />
       </div>
-    </label>
+
+      {isOpen ? (
+        <div className="inspector-color-popover" role="dialog" aria-label="Fill color picker">
+          <div className="inspector-color-preview-row">
+            <span>Preview</span>
+            <span className="inspector-color-preview" style={{ backgroundColor: draftValue }} />
+          </div>
+
+          <label className="inspector-range-field">
+            <span>Hue</span>
+            <input
+              type="range"
+              min="0"
+              max="360"
+              step="1"
+              value={draftHsv.h}
+              onChange={(event) =>
+                syncDraftFromHsv({
+                  ...draftHsv,
+                  h: Number(event.target.value),
+                })
+              }
+            />
+          </label>
+
+          <label className="inspector-range-field">
+            <span>Saturation</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={Math.round(draftHsv.s * 100)}
+              onChange={(event) =>
+                syncDraftFromHsv({
+                  ...draftHsv,
+                  s: Number(event.target.value) / 100,
+                })
+              }
+            />
+          </label>
+
+          <label className="inspector-range-field">
+            <span>Brightness</span>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="1"
+              value={Math.round(draftHsv.v * 100)}
+              onChange={(event) =>
+                syncDraftFromHsv({
+                  ...draftHsv,
+                  v: Number(event.target.value) / 100,
+                })
+              }
+            />
+          </label>
+
+          <div className="inspector-color-actions">
+            <button
+              type="button"
+              className="inspector-color-action"
+              onClick={() => closePopover(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="inspector-color-action is-primary"
+              onClick={() => closePopover(true)}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@
     "lint": "oxlint --report-unused-disable-directives",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@types/react-dom": "^19",
     "oxfmt": "^0.51.0",
     "oxlint": "^1.66.0",
+    "typescript": "^6.0.3",
     "vitest": "^4.1.7"
   }
 }

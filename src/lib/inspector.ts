@@ -51,7 +51,8 @@ export function getSharedValue<T>(values: T[]): SharedValue<T> {
     return { kind: 'empty' };
   }
 
-  const [firstValue, ...rest] = values;
+  const firstValue = values[0] as T;
+  const rest = values.slice(1);
 
   if (rest.every((value) => value === firstValue)) {
     return {

@@ -2,7 +2,7 @@
 
 ## Task Completion Requirements
 
-- All of `bun fmt`, `bun lint`, and `bun run test` must pass before a task can be considered completed.
+- All of `bun fmt`, `bun lint`, `bun typecheck` and `bun run test` must pass before a task can be considered completed.
 - Do NOT use `bun test`. Use `bun run test` instead. (uses vitest)
 
 ## Maintainability

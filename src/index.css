@@ -656,3 +656,13 @@ body {
     min-width: 220px;
   }
 }
+
+.inspector-color-wheel {
+  outline: none;
+}
+
+.inspector-color-wheel:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 2px;
+  border-radius: 50%;
+}

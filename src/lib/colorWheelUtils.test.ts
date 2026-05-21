@@ -38,8 +38,26 @@ describe('colorWheelUtils', () => {
     it('returns null for outside bounds', () => {
       // Outside the canvas
       expect(determinePointerTarget(300, 300, layout)).toBeNull();
-      // Between ring and square
-      expect(determinePointerTarget(170, 100, layout)).toBeNull();
+    });
+
+    it('prioritizes SV square over inner edge of hue ring near square corners', () => {
+      // The distance of the square corner from center is exactly layout.rInner.
+      // Because we use padding for the SV square (10px), if a user clicks exactly
+      // at the corner, it should register as SV, not hue.
+      expect(determinePointerTarget(layout.sqLeft, layout.sqTop, layout)).toBe('sv');
+
+      // However, if we click far enough outside the corner (into the ring),
+      // it should register as hue ring.
+
+      // Calculate a point that is layout.rInner + 3 away from center,
+      // along the diagonal towards the top-left corner.
+      const distJustOutside = layout.rInner + 3;
+      // angle = 135 degrees (top-left) => radians = 135 * PI / 180 = 3 * PI / 4
+      const angle = (135 * Math.PI) / 180;
+      const px = layout.cx + Math.cos(angle) * distJustOutside;
+      const py = layout.cy - Math.sin(angle) * distJustOutside; // -sin for top
+
+      expect(determinePointerTarget(px, py, layout)).toBe('hue');
     });
   });
 

@@ -36,6 +36,14 @@ export function determinePointerTarget(
   py: number,
   layout: ColorWheelLayout,
 ): 'hue' | 'sv' | null {
+  const dx = px - layout.cx;
+  const dy = py - layout.cy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  if (dist >= layout.rInner + 2 && dist <= layout.rOuter + 10) {
+    return 'hue';
+  }
+
   if (
     px >= layout.sqLeft - 10 &&
     px <= layout.sqRight + 10 &&
@@ -45,11 +53,7 @@ export function determinePointerTarget(
     return 'sv';
   }
 
-  const dx = px - layout.cx;
-  const dy = py - layout.cy;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-
-  if (dist >= layout.rInner - 5 && dist <= layout.rOuter + 5) {
+  if (dist >= layout.rInner - 5 && dist <= layout.rOuter + 10) {
     return 'hue';
   }
 

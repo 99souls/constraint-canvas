@@ -18,6 +18,7 @@ import {
 } from '../lib/color';
 import type { SharedValue, InspectorSelectionSummary } from '../lib/inspector';
 import type { LayerOrderAction } from '../lib/layering';
+import { ColorWheel } from './ColorWheel';
 
 type SelectionInspectorCardProps = {
   summary: InspectorSelectionSummary | null;
@@ -338,56 +339,9 @@ function InspectorColorField(props: InspectorColorFieldProps) {
             <span className="inspector-color-preview" style={{ backgroundColor: draftValue }} />
           </div>
 
-          <label className="inspector-range-field">
-            <span>Hue</span>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              step="1"
-              value={draftHsv.h}
-              onChange={(event) =>
-                syncDraftFromHsv({
-                  ...draftHsv,
-                  h: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-
-          <label className="inspector-range-field">
-            <span>Saturation</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={Math.round(draftHsv.s * 100)}
-              onChange={(event) =>
-                syncDraftFromHsv({
-                  ...draftHsv,
-                  s: Number(event.target.value) / 100,
-                })
-              }
-            />
-          </label>
-
-          <label className="inspector-range-field">
-            <span>Brightness</span>
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="1"
-              value={Math.round(draftHsv.v * 100)}
-              onChange={(event) =>
-                syncDraftFromHsv({
-                  ...draftHsv,
-                  v: Number(event.target.value) / 100,
-                })
-              }
-            />
-          </label>
+          <div style={{ padding: '8px 0', display: 'flex', justifyContent: 'center' }}>
+            <ColorWheel value={draftHsv} onChange={syncDraftFromHsv} size={180} />
+          </div>
 
           <div className="inspector-color-actions">
             <button

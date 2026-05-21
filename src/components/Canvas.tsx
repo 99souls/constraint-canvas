@@ -66,9 +66,10 @@ export default function Canvas() {
               <div
                 key={handle}
                 className={`resize-handle resize-handle-${handle}`}
-                onPointerDown={(event) =>
-                  editor.handleResizeHandlePointerDown(event, editor.selectionFrame.shapeId, handle)
-                }
+                onPointerDown={(event) => {
+                  const shapeId = editor.selectionFrame?.shapeId;
+                  if (shapeId != null) editor.handleResizeHandlePointerDown(event, shapeId, handle);
+                }}
               />
             ))}
           </div>

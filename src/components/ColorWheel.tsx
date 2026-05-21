@@ -1,7 +1,13 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 
 import type { HsvColor } from '../lib/color';
 import { hsvToHex } from '../lib/color';
+import {
+  calculateColorWheelLayout,
+  determinePointerTarget,
+  calculateHueFromPointer,
+  calculateSvFromPointer,
+} from '../lib/colorWheelUtils';
 
 type ColorWheelProps = {
   value: HsvColor;
@@ -13,16 +19,8 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [activeDrag, setActiveDrag] = useState<'hue' | 'sv' | null>(null);
 
-  const cx = size / 2;
-  const cy = size / 2;
-  const rOuter = size / 2 - 2;
-  const rInner = size / 2 - 24;
-  const squareSize = rInner * Math.SQRT2 - 4;
-  const sqHalf = squareSize / 2;
-  const sqLeft = cx - sqHalf;
-  const sqTop = cy - sqHalf;
-  const sqRight = cx + sqHalf;
-  const sqBottom = cy + sqHalf;
+  const layout = useMemo(() => calculateColorWheelLayout(size), [size]);
+  const { cx, cy, rOuter, rInner, squareSize, sqLeft, sqTop, sqRight, sqBottom } = layout;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -103,35 +101,18 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
     let dragTarget = activeDrag;
 
     if (e.type === 'pointerdown') {
-      const dx = px - cx;
-      const dy = py - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist >= rInner - 5 && dist <= rOuter + 5) {
-        dragTarget = 'hue';
-        setActiveDrag('hue');
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      } else if (
-        px >= sqLeft - 10 &&
-        px <= sqRight + 10 &&
-        py >= sqTop - 10 &&
-        py <= sqBottom + 10
-      ) {
-        dragTarget = 'sv';
-        setActiveDrag('sv');
+      dragTarget = determinePointerTarget(px, py, layout);
+      if (dragTarget) {
+        setActiveDrag(dragTarget);
         (e.target as HTMLElement).setPointerCapture(e.pointerId);
       }
     }
 
     if (dragTarget === 'hue') {
-      let angle = Math.atan2(py - cy, px - cx) * (180 / Math.PI);
-      if (angle < 0) angle += 360;
-      onChange({ ...value, h: angle });
+      const h = calculateHueFromPointer(px, py, layout);
+      onChange({ ...value, h });
     } else if (dragTarget === 'sv') {
-      let s = (px - sqLeft) / squareSize;
-      let v = (sqBottom - py) / squareSize;
-      s = Math.max(0, Math.min(1, s));
-      v = Math.max(0, Math.min(1, v));
+      const { s, v } = calculateSvFromPointer(px, py, layout);
       onChange({ ...value, s, v });
     }
 
@@ -146,7 +127,14 @@ export function ColorWheel({ value, onChange, size = 200 }: ColorWheelProps) {
       ref={canvasRef}
       width={size}
       height={size}
-      style={{ touchAction: 'none', cursor: 'crosshair', display: 'block', margin: '0 auto' }}
+      tabIndex={-1}
+      style={{
+        touchAction: 'none',
+        cursor: 'crosshair',
+        display: 'block',
+        margin: '0 auto',
+        outline: 'none',
+      }}
       onPointerDown={handlePointer}
       onPointerMove={activeDrag ? handlePointer : undefined}
       onPointerUp={activeDrag ? handlePointer : undefined}
